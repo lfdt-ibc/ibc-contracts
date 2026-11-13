@@ -40,18 +40,7 @@ build_dev_shell() {
 }
 step "build nix dev shell" build_dev_shell
 
-profile_marker="# ibc-contracts Nix development shell"
-if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
-  cat >>"$HOME/.bash_profile" <<EOF
-
-$profile_marker
-if [[ -z "\${IN_NIX_SHELL:-}" && ( "\$PWD" == "$repo_root" || "\$PWD" == "$repo_root"/* ) ]]; then
-  # shellcheck disable=SC1091
-  source "\$HOME/.nix-profile/etc/profile.d/nix.sh"
-  eval "\$(nix --extra-experimental-features 'nix-command flakes' --option warn-dirty false print-dev-env "$repo_root")"
-fi
-EOF
-fi
+step "install dev shell profile hook" "$repo_root/.agents/resume"
 
 in_dev_shell() {
   nix "${nix_flags[@]}" develop "$repo_root" --command "$@"
@@ -71,3 +60,7 @@ step "go mod download" in_dev_shell bash -euc '
     (cd "$(dirname "$mod")" && go mod download)
   done
 '
+
+# Amp snapshots the orb right after setup. Flush written files first: a fresh orb once came up with
+# zeroed pages in a Go module extracted near the end of setup.
+step "sync" sync
