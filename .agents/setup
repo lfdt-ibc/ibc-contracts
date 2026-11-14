@@ -62,7 +62,7 @@ step "go mod download" in_dev_shell bash -euc '
 '
 
 # `go mod download` only checks that a module zip exists, so it keeps an extracted module whose
-# files were damaged, as happened once in a snapshot. Re-extract every module `go mod verify` flags.
+# files were damaged, as happened once in a snapshot. Re-fetch every module `go mod verify` flags.
 # shellcheck disable=SC2016
 step "go mod verify" in_dev_shell bash -euc '
   modcache="$(go env GOMODCACHE)"
@@ -71,14 +71,18 @@ step "go mod verify" in_dev_shell bash -euc '
     if out="$(cd "$dir" && go mod verify 2>&1)"; then
       continue
     fi
-    printf "%s\n" "$out" | sed -n "s/.*: dir has been modified (\(.*\))$/\1/p" | while IFS= read -r bad; do
-      case "$bad" in
-        "$modcache"/*) ;;
-        *) echo "refusing to remove $bad outside $modcache" >&2; exit 1 ;;
-      esac
-      echo "re-extracting damaged module $bad"
-      chmod -R u+w "$bad"
-      rm -rf "$bad"
+    # Each failure is reported as "<module> <version>: <reason>", and the reason varies, such as
+    # "dir has been modified" or "unexpected EOF" for a truncated zip. Drop the zip and directory.
+    printf "%s\n" "$out" | sed -n "s/^\([^ ]*\) \(v[^ ]*\): .*/\1@\2/p" | while IFS= read -r modver; do
+      echo "re-fetching damaged module $modver"
+      (cd "$dir" && go mod download -json "$modver") | jq -r ".Zip, .Dir" | while IFS= read -r path; do
+        case "$path" in
+          "$modcache"/*) ;;
+          *) echo "refusing to remove $path outside $modcache" >&2; exit 1 ;;
+        esac
+        chmod -R u+w "$path"
+        rm -rf "$path" "${path%.zip}.ziphash"
+      done
     done
     (cd "$dir" && go mod download && go mod verify)
   done
