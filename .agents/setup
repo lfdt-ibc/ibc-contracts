@@ -61,6 +61,29 @@ step "go mod download" in_dev_shell bash -euc '
   done
 '
 
+# `go mod download` only checks that a module zip exists, so it keeps an extracted module whose
+# files were damaged, as happened once in a snapshot. Re-extract every module `go mod verify` flags.
+# shellcheck disable=SC2016
+step "go mod verify" in_dev_shell bash -euc '
+  modcache="$(go env GOMODCACHE)"
+  git ls-files "*go.mod" | while IFS= read -r mod; do
+    dir="$(dirname "$mod")"
+    if out="$(cd "$dir" && go mod verify 2>&1)"; then
+      continue
+    fi
+    printf "%s\n" "$out" | sed -n "s/.*: dir has been modified (\(.*\))$/\1/p" | while IFS= read -r bad; do
+      case "$bad" in
+        "$modcache"/*) ;;
+        *) echo "refusing to remove $bad outside $modcache" >&2; exit 1 ;;
+      esac
+      echo "re-extracting damaged module $bad"
+      chmod -R u+w "$bad"
+      rm -rf "$bad"
+    done
+    (cd "$dir" && go mod download && go mod verify)
+  done
+'
+
 # Amp snapshots the orb right after setup. Flush written files first: a fresh orb once came up with
 # zeroed pages in a Go module extracted near the end of setup.
 step "sync" sync
