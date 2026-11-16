@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 	"github.com/stretchr/testify/suite"
 
 	solanago "github.com/gagliardetto/solana-go"
@@ -27,9 +29,6 @@ import (
 	interchaintest "github.com/cosmos/interchaintest/v11"
 	"github.com/cosmos/interchaintest/v11/chain/cosmos"
 	"github.com/cosmos/interchaintest/v11/ibc"
-
-	ifttypes "github.com/cosmos/acme/x/ift/types"
-	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 
 	ics07_tendermint "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics07tendermint"
 	ics26_router "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics26router"

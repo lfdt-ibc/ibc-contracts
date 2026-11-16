@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 	"github.com/stretchr/testify/suite"
 
 	sdkmath "cosmossdk.io/math"
@@ -26,9 +28,6 @@ import (
 	interchaintest "github.com/cosmos/interchaintest/v11"
 	"github.com/cosmos/interchaintest/v11/chain/cosmos"
 	"github.com/cosmos/interchaintest/v11/ibc"
-
-	ifttypes "github.com/cosmos/acme/x/ift/types"
-	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/chainconfig"
 	cosmosutils "github.com/lfdt-ibc/ibc-contracts/e2e/v8/cosmos"

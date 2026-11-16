@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 	"github.com/stretchr/testify/suite"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -31,9 +33,6 @@ import (
 	interchaintest "github.com/cosmos/interchaintest/v11"
 	interchaintestcosmos "github.com/cosmos/interchaintest/v11/chain/cosmos"
 	"github.com/cosmos/interchaintest/v11/ibc"
-
-	ifttypes "github.com/cosmos/acme/x/ift/types"
-	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ics26router"
 	evmift "github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ift"

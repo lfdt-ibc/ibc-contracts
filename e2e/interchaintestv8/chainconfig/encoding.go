@@ -3,6 +3,9 @@
 package chainconfig
 
 import (
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -32,9 +35,6 @@ import (
 	// interchaintest's copy of the 08-wasm types is used instead of the 08-wasm module: both register the
 	// same proto names, and only the first registration (by package init order) gets a type URL.
 	wasmtypes "github.com/cosmos/interchaintest/v11/chain/cosmos/08-wasm-types"
-
-	ifttypes "github.com/cosmos/acme/x/ift/types"
-	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 
 	proposaltypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/paramsproposal"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/attestations"
