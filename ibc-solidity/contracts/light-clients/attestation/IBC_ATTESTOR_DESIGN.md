@@ -147,7 +147,7 @@ Access control:
 
 ### misbehaviour(...)
 
-Out of scope for this version. The function exists but always reverts with `FeatureNotSupported`.
+Out of scope for this version. The function exists but always reverts: with `FrozenClientState` if the client is frozen, otherwise with `FeatureNotSupported`.
 
 ## Roles and Permissions
 

@@ -67,7 +67,7 @@ Key settings:
 - `observability.otel_endpoint`: OpenTelemetry collector endpoint.
 - `modules`: List of modules to run, each with `name`, `src_chain`, `dst_chain`, `config`, and optional `enabled` (defaults to true). For EVM-to-EVM modules, `Info` returns the routed `src_chain` as the source identity and the destination RPC chain ID as the target identity.
 
-Module configuration varies by module type. Proof modes are externally tagged: a mode without options is a string (for example `"mock"`), and a mode with options is an object with a single key naming the mode (for example `{ "attested": { "attestor": { ... } } }`).
+Proof modes are externally tagged: a mode without options is a string (for example `"mock"`), and a mode with options is an object with a single key naming the mode (for example `{ "attested": { "attestor": { ... } } }`).
 
 Module configuration varies by module type:
 
@@ -147,7 +147,7 @@ Module configuration varies by module type:
   - `solana_fee_payer`: Solana fee payer address.
   - `solana_alt_address`: Address lookup table address (optional).
   - `solana_ift_program_ids`: Whitelisted Solana IFT program IDs. Empty disables IFT relay. (default: `[]`)
-  - `skip_pre_verify_threshold`: Skip pre-verification when the number of signatures is at most this threshold; `null` always pre-verifies. (default: 50)
+  - `skip_pre_verify_threshold`: Skip pre-verification when the number of signatures is at most this threshold and the transaction accounts fit without an address lookup table; `null` always pre-verifies. (default: 50)
   - `mode`: `"ics07_tendermint"` or `{ "attested": { ... } }` with the same attestor and cache settings as above. (default: `"ics07_tendermint"`)
 - `solana_to_cosmos`:
   - `solana_chain_id`: Solana chain ID label.

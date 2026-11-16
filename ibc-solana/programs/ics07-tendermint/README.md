@@ -17,7 +17,7 @@ The client implements a mandatory chunked upload mechanism for all header update
 1. **Headers are split into chunks**: Large headers are divided into manageable pieces that fit within Solana transactions
 2. **Full parallel upload support**: All chunks can be uploaded in parallel for maximum throughput
 3. **Each relayer has isolated storage**: Chunks are stored in PDAs derived from the relayer's address, preventing interference between relayers
-4. **Relayers pay rent**: The submitting relayer pays for all storage (chunk and signature verification accounts)
+4. **Relayers pay rent**: The submitting relayer pays for all storage: the temporary chunk and signature verification accounts, and the permanent `ConsensusStateStore` account created for each new height
 5. **Assembly triggers verification**: Once all chunks are uploaded, the relayer calls `assemble_and_update_client` to reconstruct and verify the header
 
 ### Key Design Principles
@@ -355,7 +355,7 @@ This parallel approach can reduce upload time from `n * block_time` to `2 * bloc
 
 - **Temporary Storage**: Chunks and signature verifications are temporary, existing only during upload
 - **Rent Responsibility**: Uploading relayer pays all rent (~0.01 SOL per account)
-- **Manual Cleanup Required**: Relayers must call `cleanup_incomplete_upload` after both successful and failed header updates, and `cleanup_incomplete_misbehaviour` after failed misbehaviour submissions, to reclaim rent
+- **Manual Cleanup Required**: Relayers must call `cleanup_incomplete_upload` after both successful and failed header updates, and `cleanup_incomplete_misbehaviour` after failed misbehaviour submissions, to reclaim rent. `cleanup_incomplete_misbehaviour` closes only misbehaviour chunks; signature verification PDAs, including those created for a misbehaviour submission, are closed only by `cleanup_incomplete_upload`
 - **No Cross-Relayer Interference**: Each relayer's uploads are isolated
 
 ## Security Considerations
@@ -479,7 +479,7 @@ The update client process is split into two phases:
 
 ## Design Decisions
 
-### Why On-Chain Signature Verification Instead of Ed25519Program?
+### Why Both On-Chain Signature Verification and Ed25519Program?
 
 `brine-ed25519` is the in-program Ed25519 verifier (~30k CU per signature). It verifies every signature in `assemble_and_update_client` that does not already have a pre-verification PDA. The relayer can avoid that cost by pre-verifying signatures through `pre_verify_signature`: it extracts the signatures from the header off-chain and submits them as `Ed25519Program` instructions in parallel transactions (see "Update Client Performance Optimizations" above).
 
@@ -489,7 +489,7 @@ Ed25519Program only verifies signatures included as instructions in the current 
 
 - Pre-verification stays optional: a relayer can submit a header without it, at the cost of more compute units in the assembly transaction
 - Any signature that was not pre-verified is still checked on-chain, so correctness never depends on the relayer having pre-verified all of them
-- Small validator sets can update in a single assembly transaction without extra prep transactions
+- Small validator sets can update in a single assembly transaction without pre-verification transactions
 
 For large validator sets (50+ validators), verifying every signature with `brine-ed25519` would exceed Solana's 1.4M CU transaction limit, so pre-verification is required in practice. Pre-verification transactions run in parallel, not sequentially; see the benchmarks above for measured latency.
 
