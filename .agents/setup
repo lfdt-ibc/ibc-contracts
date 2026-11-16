@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Prepares an Amp orb: builds the flake's default Nix dev shell, makes it the environment of
+# login shells started in this repository, and prefetches Cargo and Go dependencies.
+# Must stay non-interactive and idempotent; it reruns on stale snapshots.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+step() {
+  local name="$1"
+  shift
+  local start=$SECONDS
+  echo "==> $name"
+  "$@"
+  echo "<== $name ($((SECONDS - start))s)"
+}
+
+install_nix() {
+  if [ -x "$HOME/.nix-profile/bin/nix" ]; then
+    return
+  fi
+  curl --proto '=https' --tlsv1.2 -sSfL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+}
+step "install nix" install_nix
+
+# The installer cannot update this running script's environment.
+# shellcheck disable=SC1091
+source "$HOME/.nix-profile/etc/profile.d/nix.sh"
+
+nix_flags=(--extra-experimental-features "nix-command flakes" --option max-jobs auto)
+gc_root_dir="$HOME/.local/state/ibc-contracts"
+mkdir -p "$gc_root_dir"
+
+# `--profile` registers a GC root so `nix-collect-garbage` does not delete the shell.
+build_dev_shell() {
+  nix "${nix_flags[@]}" print-dev-env --profile "$gc_root_dir/dev-shell" "$repo_root" >/dev/null
+}
+step "build nix dev shell" build_dev_shell
+
+step "install dev shell profile hook" "$repo_root/.agents/resume"
+
+in_dev_shell() {
+  nix "${nix_flags[@]}" develop "$repo_root" --command "$@"
+}
+
+# The root workspace plus the separate workspaces that default-shell recipes build. ibc-solana
+# belongs to the Solana shell, which setup does not prebuild.
+for manifest in Cargo.toml \
+  ibc-solidity/programs/cw-ics08-wasm-eth/Cargo.toml \
+  ibc-solidity/programs/sp1-programs/Cargo.toml; do
+  step "cargo fetch $manifest" in_dev_shell cargo fetch --locked --manifest-path "$manifest"
+done
+
+# shellcheck disable=SC2016
+step "go mod download" in_dev_shell bash -euc '
+  git ls-files "*go.mod" | while IFS= read -r mod; do
+    (cd "$(dirname "$mod")" && go mod download)
+  done
+'
+
+# `go mod download` only checks that a module zip exists, so it keeps an extracted module whose
+# files were damaged, as happened once in a snapshot. Re-fetch every module `go mod verify` flags.
+# shellcheck disable=SC2016
+step "go mod verify" in_dev_shell bash -euc '
+  modcache="$(go env GOMODCACHE)"
+  git ls-files "*go.mod" | while IFS= read -r mod; do
+    dir="$(dirname "$mod")"
+    if out="$(cd "$dir" && go mod verify 2>&1)"; then
+      continue
+    fi
+    # Each failure is reported as "<module> <version>: <reason>", and the reason varies, such as
+    # "dir has been modified" or "unexpected EOF" for a truncated zip. Drop the zip and directory.
+    printf "%s\n" "$out" | sed -n "s/^\([^ ]*\) \(v[^ ]*\): .*/\1@\2/p" | while IFS= read -r modver; do
+      echo "re-fetching damaged module $modver"
+      (cd "$dir" && go mod download -json "$modver") | jq -r ".Zip, .Dir" | while IFS= read -r path; do
+        case "$path" in
+          "$modcache"/*) ;;
+          *) echo "refusing to remove $path outside $modcache" >&2; exit 1 ;;
+        esac
+        chmod -R u+w "$path"
+        rm -rf "$path" "${path%.zip}.ziphash"
+      done
+    done
+    (cd "$dir" && go mod download && go mod verify)
+  done
+'
+
+# Amp snapshots the orb right after setup. Flush written files first: a fresh orb once came up with
+# zeroed pages in a Go module extracted near the end of setup.
+step "sync" sync

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# Makes login shells on an Amp orb load this repository's Nix dev shell, including the shell that
+# starts the Amp agent. The hook must be the last block in ~/.bash_profile: Amp appends its own
+# block during orb activation, after .agents/setup ran, and that block re-sources ~/.env, which
+# resets PATH. Amp runs this script after activation and on every wake; setup runs it too.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+profile="$HOME/.bash_profile"
+begin="# >>> ibc-contracts Nix development shell >>>"
+end="# <<< ibc-contracts Nix development shell <<<"
+
+# The Amp agent starts from `bash -lc` in `/` and only then changes into the repository, so match
+# AMP_WORKING_DIRECTORY (from ~/.env) as well as the current directory.
+hook="$begin
+if [[ -z \"\${IN_NIX_SHELL:-}\" ]]; then
+  dir_before=\"\$PWD\"
+  for dir in \"\$PWD\" \"\${AMP_WORKING_DIRECTORY:-}\"; do
+    if [[ \"\$dir\" == \"$repo_root\" || \"\$dir\" == \"$repo_root\"/* ]]; then
+      # shellcheck disable=SC1091
+      source \"\$HOME/.nix-profile/etc/profile.d/nix.sh\"
+      # The flake's shellHook links ibc-solidity/node_modules relative to the current directory.
+      builtin cd -- \"$repo_root\"
+      eval \"\$(nix --extra-experimental-features 'nix-command flakes' --option warn-dirty false print-dev-env \"$repo_root\")\"
+      builtin cd -- \"\$dir_before\"
+      break
+    fi
+  done
+  unset dir dir_before
+fi
+$end"
+
+current=""
+if [ -f "$profile" ]; then
+  current="$(<"$profile")"
+fi
+
+# Drop the existing hook, including the unmarked one from the first version of .agents/setup.
+others="$(printf '%s\n' "$current" | awk -v begin="$begin" -v end="$end" '
+  $0 == begin { skip = "end"; next }
+  skip == "end" { if ($0 == end) skip = ""; next }
+  $0 == "# ibc-contracts Nix development shell" { skip = "fi"; next }
+  skip == "fi" { if ($0 == "fi") skip = ""; next }
+  { print }
+')"
+# Strip trailing blank lines so repeated runs do not add any.
+others="$(printf '%s\n' "$others" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
+
+wanted="$hook"
+if [ -n "$others" ]; then
+  wanted="$others
+
+$hook"
+fi
+if [ "$current" != "$wanted" ]; then
+  printf '%s\n' "$wanted" >"$profile"
+fi
