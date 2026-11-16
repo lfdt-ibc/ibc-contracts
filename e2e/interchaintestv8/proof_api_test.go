@@ -876,25 +876,25 @@ func (s *ProofAPITestSuite) Test_Gloas_Fork_PeriodBoundary() {
 
 // Test_Gloas_Fork_MidPeriod forks inside a sync committee period. On the minimal preset, the update
 // of the period attests a Gloas block and finalizes the Fulu block on the period boundary.
+//
+// This isn't expected on a real network: every mainnet fork since Altair, and the Gloas fork of
+// Sepolia, is on a sync committee period boundary. Nothing in the specs requires it, so the client
+// must still handle it.
 func (s *ProofAPITestSuite) Test_Gloas_Fork_MidPeriod() {
-	var gloasForkEpoch uint64
-	if chainconfig.GetKurtosisPreset() == testvalues.EnvValueEthereumPosPreset_Minimal {
-		gloasForkEpoch = 41
-	} else {
-		// For mainnet, epochs are longer so we set the fork epoch lower to avoid long waits. The setup
-		// waits for the chain to finalize at epoch 4, and the first packet is finalized at epoch 7, or
-		// 8 if the setup is slow. The release relaying it can't decode Gloas light client updates.
-		gloasForkEpoch = 9
+	// On the mainnet preset, the test never leaves the first sync committee period, so it doesn't
+	// cover the update above.
+	if chainconfig.GetKurtosisPreset() != testvalues.EnvValueEthereumPosPreset_Minimal {
+		s.T().Skip("A sync committee period of the mainnet preset takes too long")
 	}
 
-	s.GloasForkTest(context.Background(), gloasForkEpoch)
+	s.GloasForkTest(context.Background(), 41)
 }
 
 // GloasForkTest upgrades a live light client through the Gloas fork in the same way as on mainnet.
 // The client is created on Fulu with the latest release, which doesn't know about Gloas and is
 // served by the backwards compatible proof API module. The client is migrated to the local version
-// before the fork. A packet sent before the fork and a packet sent after it must both be relayed
-// once the fork has finalized.
+// before the fork. A packet sent before the fork and a packet sent after it are then relayed
+// together, which updates the client past the fork.
 func (s *ProofAPITestSuite) GloasForkTest(ctx context.Context, gloasForkEpoch uint64) {
 	if os.Getenv(testvalues.EnvKeyEthTestnetType) != testvalues.EthTestnetTypePoS {
 		s.T().Skip("Test is only relevant for PoS networks")
@@ -969,16 +969,17 @@ func (s *ProofAPITestSuite) GloasForkTest(ctx context.Context, gloasForkEpoch ui
 	s.Require().NoError(err)
 	s.Require().Less(uint64(header.Header.Message.Slot)/spec.SlotsPerEpoch, gloasForkEpoch, "the chain forked before the packet was sent")
 
-	s.Require().True(s.Run("Wait for the fork to finalize", func() {
-		err := testutil.WaitForCondition(time.Minute*30, time.Second*30, func() (bool, error) {
-			finalityUpdate, err := eth.BeaconAPIClient.GetFinalityUpdate()
+	// The relay waits for the packet sent after the fork to finalize, so the client follows the fork
+	s.Require().True(s.Run("Wait for the fork", func() {
+		err := testutil.WaitForCondition(time.Minute*30, time.Second*10, func() (bool, error) {
+			header, err := eth.BeaconAPIClient.GetHeader("head")
 			if err != nil {
 				return false, err
 			}
 
-			finalizedEpoch := finalityUpdate.Data.FinalizedHeader.Beacon.GetSlot() / spec.SlotsPerEpoch
-			s.T().Logf("Waiting for epoch %d, current finalized epoch: %d", gloasForkEpoch, finalizedEpoch)
-			return finalizedEpoch >= gloasForkEpoch, nil
+			epoch := uint64(header.Header.Message.Slot) / spec.SlotsPerEpoch
+			s.T().Logf("Waiting for epoch %d, current epoch: %d", gloasForkEpoch, epoch)
+			return epoch >= gloasForkEpoch, nil
 		})
 		s.Require().NoError(err)
 	}))
