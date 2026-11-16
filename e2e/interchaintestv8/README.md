@@ -32,6 +32,12 @@ just test-e2e TestWithIbcEurekaTestSuite/Test_Deploy
 just test-e2e-eureka Test_Deploy
 ```
 
+## IFT tests and the acme chain
+
+The IFT suites (`just test-e2e-cosmos-ift`, `just test-e2e-cosmos-ethereum-ift`, `just test-e2e-solana-ift`) run the Cosmos side on [acme](https://github.com/cosmos/acme), an open-source Cosmos SDK chain with the `ift` and `tokenfactory` modules (image `ghcr.io/cosmos/acme`, binary `acmed`, bech32 prefix `acme`). The e2e module imports the acme message types directly from `github.com/cosmos/acme/x/{ift,tokenfactory}/types`.
+
+`testvalues.DeterministicICAAddress` depends on the acme prefix; recompute it with `just compute-ift-addresses` if the prefix, client ID, or deploy order changes.
+
 ## Besu QBFT mode
 
 Set `ETH_TESTNET_TYPE=besu-qbft` to start a real 4-validator Besu QBFT network.

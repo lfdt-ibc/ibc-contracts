@@ -423,16 +423,16 @@ mod tests {
     #[test]
     fn test_construct_cosmos_mint_call_with_ibc_denom() {
         let payload = construct_cosmos_mint_call(
-            "/wfchain.ift.MsgIFTMint",
-            "wf1icaaddress",
+            "/acme.ift.MsgIFTMint",
+            "acme1icaaddress",
             "ibc/ABC123",
             "cosmos1xyz",
             42,
         );
         let json_str = String::from_utf8(payload).unwrap();
         assert!(json_str.contains("\"denom\":\"ibc/ABC123\""));
-        assert!(json_str.contains("\"@type\":\"/wfchain.ift.MsgIFTMint\""));
-        assert!(json_str.contains("\"signer\":\"wf1icaaddress\""));
+        assert!(json_str.contains("\"@type\":\"/acme.ift.MsgIFTMint\""));
+        assert!(json_str.contains("\"signer\":\"acme1icaaddress\""));
     }
 
     #[derive(Clone)]

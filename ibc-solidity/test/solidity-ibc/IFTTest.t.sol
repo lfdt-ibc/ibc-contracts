@@ -1582,7 +1582,7 @@ contract IFTTest is Test {
     }
 
     function test_cosmosCallConstructor_constructor() public {
-        string memory typeUrl = "/wfchain.ift.MsgIFTMint";
+        string memory typeUrl = "/acme.ift.MsgIFTMint";
         string memory tokenDenom = "uatom";
         string memory ica = "cosmos1abc123";
 
@@ -1597,7 +1597,7 @@ contract IFTTest is Test {
         CosmosMintCallTestCase[] memory testCases = new CosmosMintCallTestCase[](19);
 
         testCases[0] = CosmosMintCallTestCase({
-            name: "success: bech32 receiver", receiver: "wf1address234", amount: 1_000_000, expectedRevert: ""
+            name: "success: bech32 receiver", receiver: "acme1address234", amount: 1_000_000, expectedRevert: ""
         });
         testCases[1] = CosmosMintCallTestCase({
             name: "success: hex address receiver",
@@ -1661,66 +1661,66 @@ contract IFTTest is Test {
         });
         testCases[11] = CosmosMintCallTestCase({
             name: "revert: missing separator",
-            receiver: "wf2345a",
+            receiver: "acme2345a",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf2345a"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme2345a"
             )
         });
         testCases[12] = CosmosMintCallTestCase({
             name: "revert: invalid hrp capital",
-            receiver: "WF12345a",
+            receiver: "ACME12345a",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "WF12345a"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "ACME12345a"
             )
         });
         testCases[13] = CosmosMintCallTestCase({
             name: "revert: invalid data char 1",
-            receiver: "wf1rece1ver",
+            receiver: "acme1rece1ver",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf1rece1ver"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme1rece1ver"
             )
         });
         testCases[14] = CosmosMintCallTestCase({
             name: "revert: invalid data char i",
-            receiver: "wf1receiver",
+            receiver: "acme1receiver",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf1receiver"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme1receiver"
             )
         });
         testCases[15] = CosmosMintCallTestCase({
             name: "revert: invalid data char o",
-            receiver: "wf1receiver",
+            receiver: "acme1receiver",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf1receiver"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme1receiver"
             )
         });
         testCases[16] = CosmosMintCallTestCase({
             name: "revert: invalid data char b",
-            receiver: "wf1recebr",
+            receiver: "acme1recebr",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf1recebr"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme1recebr"
             )
         });
         testCases[17] = CosmosMintCallTestCase({
             name: "revert: invalid data char {",
-            receiver: "wf1address{",
+            receiver: "acme1address{",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf1address{"
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme1address{"
             )
         });
         testCases[18] = CosmosMintCallTestCase({
             name: "revert: invalid data char \"",
-            receiver: "wf1address\"",
+            receiver: "acme1address\"",
             amount: 10,
             expectedRevert: abi.encodeWithSelector(
-                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "wf1address\""
+                CosmosIFTSendCallConstructor.CosmosIFTInvalidReceiver.selector, "acme1address\""
             )
         });
 
@@ -1728,9 +1728,9 @@ contract IFTTest is Test {
     }
 
     function tableCosmosMintCallTest(CosmosMintCallTestCase memory cosmosMintCallTC) public {
-        string memory typeUrl = "/wfchain.ift.MsgIFTMint";
+        string memory typeUrl = "/acme.ift.MsgIFTMint";
         string memory tokenDenom = "testift";
-        string memory ica = "wf1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5a9p63";
+        string memory ica = "acme1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqhua0z8";
 
         CosmosIFTSendCallConstructor constructor_ = new CosmosIFTSendCallConstructor(typeUrl, tokenDenom, ica);
 
@@ -1761,7 +1761,7 @@ contract IFTTest is Test {
 
     function test_cosmosCallConstructor_supportsInterface() public {
         CosmosIFTSendCallConstructor constructor_ =
-            new CosmosIFTSendCallConstructor("/wfchain.ift.MsgIFTMint", "testift", "wf1ica");
+            new CosmosIFTSendCallConstructor("/acme.ift.MsgIFTMint", "testift", "acme1ica");
 
         assertTrue(constructor_.supportsInterface(type(IIFTSendCallConstructor).interfaceId));
 

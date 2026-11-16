@@ -35,6 +35,8 @@ import (
 	"github.com/cosmos/interchaintest/v11/ibc"
 	"github.com/cosmos/interchaintest/v11/testutil"
 
+	solanatypes "github.com/cosmos/solidity-ibc-eureka/packages/go-proto/solana"
+
 	access_manager "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/accessmanager"
 	ics07_tendermint "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics07tendermint"
 	ics26_router "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics26router"
@@ -47,7 +49,6 @@ import (
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/types"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/gmphelpers"
 	proofapitypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/proofapi"
-	solanatypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/solana"
 )
 
 // IbcEurekaSolanaGMPTestSuite is a test suite for Solana GMP tests
