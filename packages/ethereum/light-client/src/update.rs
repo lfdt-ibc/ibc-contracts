@@ -16,8 +16,8 @@ use crate::{
 /// Returns the updated slot, the updated consensus state and optionally the updated client state.
 ///
 /// # Errors
-/// Returns an error if the trusted consensus state is newer than the latest slot or in another
-/// sync committee period, or if the store period is not equal to the finalized period
+/// Returns an error if the trusted consensus state is not in the sync committee period of the
+/// latest slot, or if the store period is not equal to the finalized period
 #[allow(clippy::module_name_repetitions, clippy::needless_pass_by_value)]
 pub fn update_consensus_state(
     trusted_consensus_state: ConsensusState,
@@ -27,16 +27,8 @@ pub fn update_consensus_state(
     let store_slot = trusted_consensus_state.slot;
     let store_period = current_client_state.compute_sync_committee_period_at_slot(store_slot);
 
-    // The latest slot is the highest slot with a consensus state, and `verify_header` only accepts
-    // a trusted consensus state in its period. Both are checked again here, so that this function
-    // doesn't depend on the checks of its caller.
-    ensure!(
-        store_slot <= current_client_state.latest_slot,
-        EthereumIBCError::TrustedSlotMoreRecentThanLatestSlot {
-            trusted_slot: store_slot,
-            latest_slot: current_client_state.latest_slot,
-        }
-    );
+    // `verify_header` only accepts a trusted consensus state in the period of the latest slot. This
+    // is checked again here, so that this function doesn't depend on the checks of its caller.
     let latest_period = current_client_state
         .compute_sync_committee_period_at_slot(current_client_state.latest_slot);
     ensure!(
@@ -158,25 +150,6 @@ mod test {
         assert_eq!(historical_slot, updated_slot);
         assert_eq!(historical_consensus_state, updated_consensus_state);
         assert!(historical_client_state.is_none());
-    }
-
-    #[test]
-    fn test_update_consensus_state_trusted_slot_after_latest_slot() {
-        let (client_state, consensus_state, header, _) = load_fixture();
-
-        let client_state = ClientState {
-            latest_slot: consensus_state.slot - 1,
-            ..client_state
-        };
-        let err =
-            update_consensus_state(consensus_state.clone(), client_state, header).unwrap_err();
-        assert_eq!(
-            err,
-            EthereumIBCError::TrustedSlotMoreRecentThanLatestSlot {
-                trusted_slot: consensus_state.slot,
-                latest_slot: consensus_state.slot - 1,
-            }
-        );
     }
 
     #[test]
