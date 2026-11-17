@@ -185,6 +185,12 @@ pub enum EthereumIBCError {
         latest_period: u64,
     },
 
+    #[error(
+        "trusted consensus state slot ({trusted_slot}) is more recent than the latest slot \
+        ({latest_slot})"
+    )]
+    TrustedSlotMoreRecentThanLatestSlot { trusted_slot: u64, latest_slot: u64 },
+
     #[error("failed to compute slot at timestamp with  \
         (timestamp ({timestamp}) - genesis ({genesis})) / seconds_per_slot ({seconds_per_slot}) + genesis_slot ({genesis_slot})"
     )]
