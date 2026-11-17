@@ -1413,31 +1413,41 @@ func (s *ProofAPITestSuite) Test_UpdateClientToCosmos() {
 	}))
 }
 
-// UpdateClientAtPeriodStart waits until the first epoch of a sync committee period is finalized and
-// updates the Ethereum light client on Cosmos to it. The light client only accepts updates that are
-// trusted against a consensus state in the sync committee period of its latest slot, so this leaves
-// the rest of the period for relay txs that are broadcast after the client has been updated past
-// their trusted slot.
-func (s *ProofAPITestSuite) UpdateClientAtPeriodStart(ctx context.Context) {
+// UpdateClientEarlyInPeriod waits until the latest finalized slot is early in its sync committee
+// period and updates the Ethereum light client on Cosmos to it. The light client only accepts
+// updates that are trusted against a consensus state in the sync committee period of its latest
+// slot, so this leaves the rest of the period for relay txs that are broadcast after the client
+// has been updated past their trusted slot.
+func (s *ProofAPITestSuite) UpdateClientEarlyInPeriod(ctx context.Context) {
 	eth, simd := s.Eth.Chains[0], s.Cosmos.Chains[0]
 
 	_, ethClientState := s.GetEthereumClientState(ctx, simd, testvalues.FirstWasmClientID)
 	period := ethClientState.EpochsPerSyncCommitteePeriod * ethClientState.SlotsPerEpoch
 
+	// A period has 8 epochs on the minimal preset, so this waits for the first epoch of a period
+	// there. On the mainnet preset it only waits during the last 7 of the 256 epochs of a period.
+	const minEpochsLeftInPeriod = 7
+
+	var finalizedSlot uint64
 	err := testutil.WaitForCondition(30*time.Minute, 5*time.Second, func() (bool, error) {
 		resp, err := eth.BeaconAPIClient.GetFinalityUpdate()
 		if err != nil {
 			return false, err
 		}
 
-		finalizedSlot, err := strconv.ParseUint(resp.Data.FinalizedHeader.Beacon.Slot, 10, 64)
+		finalizedSlot, err = strconv.ParseUint(resp.Data.FinalizedHeader.Beacon.Slot, 10, 64)
 		if err != nil {
 			return false, err
 		}
 
-		return finalizedSlot > ethClientState.LatestSlot && finalizedSlot%period < ethClientState.SlotsPerEpoch, nil
+		return finalizedSlot%period+minEpochsLeftInPeriod*ethClientState.SlotsPerEpoch < period, nil
 	})
 	s.Require().NoError(err)
+
+	if finalizedSlot <= ethClientState.LatestSlot {
+		// The client is already at the latest finalized slot.
+		return
+	}
 
 	resp, err := s.ProofApiClient.UpdateClient(context.Background(), &proofapitypes.UpdateClientRequest{
 		SrcChain:    eth.ChainID.String(),
@@ -1452,7 +1462,7 @@ func (s *ProofAPITestSuite) UpdateClientAtPeriodStart(ctx context.Context) {
 
 // Test_HistoricalUpdateClientToCosmos tests updating the eth light client with updates that are not the latest
 // To do this, we will:
-// 1. Update the client at the start of a sync committee period, since the historical update must be
+// 1. Update the client early in a sync committee period, since the historical update must be
 // trusted against a consensus state in the sync committee period of the latest slot
 // 2. Send a transfer on Ethereum
 // 3. Retrieve the relay tx from the relayer
@@ -1488,8 +1498,8 @@ func (s *ProofAPITestSuite) Test_HistoricalUpdateClientToCosmos() {
 		s.Require().Equal(ethtypes.ReceiptStatusSuccessful, receipt.Status)
 	}))
 
-	s.Require().True(s.Run("Update the client at the start of a sync committee period", func() {
-		s.UpdateClientAtPeriodStart(ctx)
+	s.Require().True(s.Run("Update the client early in a sync committee period", func() {
+		s.UpdateClientEarlyInPeriod(ctx)
 	}))
 
 	var sendTxHash []byte
@@ -1824,8 +1834,8 @@ func (s *ProofAPITestSuite) ConcurrentRecvPacketToCosmos(
 	if os.Getenv(testvalues.EnvKeyEthTestnetType) == testvalues.EthTestnetTypePoS {
 		// The relay txs below are all built against the same latest slot, and must be broadcast
 		// before the client is updated to the next sync committee period.
-		s.Require().True(s.Run("Update the client at the start of a sync committee period", func() {
-			s.UpdateClientAtPeriodStart(ctx)
+		s.Require().True(s.Run("Update the client early in a sync committee period", func() {
+			s.UpdateClientEarlyInPeriod(ctx)
 		}))
 	}
 
