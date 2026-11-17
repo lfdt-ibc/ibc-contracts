@@ -186,11 +186,14 @@ pub enum EthereumIBCError {
         genesis_slot: u64,
     },
 
-    #[error("conflicting updates are for different slots: {0} != {1}")]
-    MisbehaviourSlotMismatch(u64, u64),
+    #[error("finalized headers are not conflicting: both have root {0}")]
+    MisbehaviourFinalizedRootsMatch(B256),
 
-    #[error("execution block hashes are not conflicting: {0} == {0}")]
-    MisbehaviourExecutionBlockHashesMatch(B256),
+    #[error(
+        "finalized headers are not conflicting: slots {slot_1} and {slot_2} differ \
+        and the finalized checkpoints are for different epochs"
+    )]
+    MisbehaviourFinalizedHeadersNotConflicting { slot_1: u64, slot_2: u64 },
 
     #[error(
         "update must be against a previous consensus state: \

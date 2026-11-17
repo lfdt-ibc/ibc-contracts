@@ -16,7 +16,7 @@ We support Merkle-Patricia Trie (MPT) inclusion and exclusion proofs to verify t
 
 ### Misbehavior Handling
 
-Misbehavior is defined as the submission of two conflicting—but individually valid—light client updates for the same block height. Upon detecting such a case, the light client will **freeze**, halting further updates. Recovery requires a governance proposal to reset or reinitialize the client.
+Misbehavior is defined as the submission of two individually valid light client updates that finalize conflicting headers: different finalized headers for the same slot or for the same finalized checkpoint epoch. Both updates must be signed by at least 2/3 of the sync committee, as for a client update. Upon detecting such a case, the light client will **freeze**, halting further updates. Recovery requires a governance proposal to reset or reinitialize the client.
 
 ## Deployment
 
