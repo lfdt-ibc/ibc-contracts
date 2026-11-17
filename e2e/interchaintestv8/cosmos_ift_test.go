@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 	"github.com/stretchr/testify/suite"
 
 	sdkmath "cosmossdk.io/math"
@@ -34,11 +36,9 @@ import (
 	proofapi "github.com/lfdt-ibc/ibc-contracts/e2e/v8/proofapi"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/testvalues"
 	proofapitypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/proofapi"
-	ifttypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/wfchain/ift"
-	tokenfactorytypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/wfchain/tokenfactory"
 )
 
-// CosmosIFTTestSuite tests IFT transfers between two wfchain instances
+// CosmosIFTTestSuite tests IFT transfers between two acme instances
 type CosmosIFTTestSuite struct {
 	e2esuite.TestSuite
 
@@ -56,10 +56,10 @@ func TestWithCosmosIFTTestSuite(t *testing.T) {
 }
 
 func (s *CosmosIFTTestSuite) SetupSuite(ctx context.Context) {
-	// Use two wfchain instances
+	// Use two acme instances
 	chainconfig.DefaultChainSpecs = []*interchaintest.ChainSpec{
-		chainconfig.WfchainChainSpec("wfchain-1", "wfchain-1"),
-		chainconfig.WfchainChainSpec("wfchain-2", "wfchain-2"),
+		chainconfig.AcmeChainSpec("acme-1", "acme-1"),
+		chainconfig.AcmeChainSpec("acme-2", "acme-2"),
 	}
 
 	os.Setenv(testvalues.EnvKeyEthTestnetType, testvalues.EthTestnetType_None)

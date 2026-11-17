@@ -33,7 +33,6 @@ import (
 	"github.com/cosmos/interchaintest/v11/testutil"
 
 	ics26router "github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ics26router"
-
 	access_manager "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/accessmanager"
 	attestation "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/attestation"
 	ics07_tendermint "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics07tendermint"

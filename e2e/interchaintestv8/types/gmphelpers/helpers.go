@@ -13,8 +13,9 @@ import (
 
 	gmptypes "github.com/lfdt-ibc/ibc-go/v11/modules/apps/27-gmp/types"
 
+	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
+
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/testvalues"
-	solanatypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/solana"
 )
 
 // packedAccountSize is the size of a single packed account entry: pubkey(32) + is_signer(1) + is_writable(1).

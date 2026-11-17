@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
 	"github.com/stretchr/testify/suite"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -44,16 +46,14 @@ import (
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/testvalues"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/types"
 	proofapitypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/proofapi"
-	ifttypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/wfchain/ift"
-	tokenfactorytypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/wfchain/tokenfactory"
 )
 
-// CosmosEthereumIFTTestSuite tests IFT transfers between wfchain and Ethereum
+// CosmosEthereumIFTTestSuite tests IFT transfers between acme and Ethereum
 type CosmosEthereumIFTTestSuite struct {
 	e2esuite.TestSuite
 
 	// Cosmos chain
-	Wfchain *interchaintestcosmos.CosmosChain
+	Acme *interchaintestcosmos.CosmosChain
 
 	// Ethereum contracts
 	contractAddresses ethereum.DeployedContracts
@@ -88,9 +88,9 @@ func TestWithCosmosEthereumIFTTestSuite(t *testing.T) {
 }
 
 func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType types.SupportedProofType) {
-	// Use wfchain as the Cosmos chain
+	// Use acme as the Cosmos chain
 	chainconfig.DefaultChainSpecs = []*interchaintest.ChainSpec{
-		chainconfig.WfchainChainSpec("wfchain-1", "wfchain-1"),
+		chainconfig.AcmeChainSpec("acme-1", "acme-1"),
 	}
 
 	// Set up Ethereum chain with native attestor light client
@@ -100,7 +100,7 @@ func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType t
 	s.TestSuite.SetupSuite(ctx)
 
 	eth := s.Eth.Chains[0]
-	s.Wfchain = s.Cosmos.Chains[0]
+	s.Acme = s.Cosmos.Chains[0]
 	s.proofType = proofType
 
 	s.T().Logf("Setting up Cosmos-Ethereum IFT test suite with proof type: %s", proofType.String())
@@ -121,8 +121,8 @@ func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType t
 		s.ethDeployer, err = eth.CreateAndFundUserFromKey(testvalues.E2EDeployerPrivateKeyHex)
 		s.Require().NoError(err)
 
-		s.CosmosRelayerSubmitter = s.CreateAndFundCosmosUser(ctx, s.Wfchain)
-		s.CosmosUser = s.CreateAndFundCosmosUser(ctx, s.Wfchain)
+		s.CosmosRelayerSubmitter = s.CreateAndFundCosmosUser(ctx, s.Acme)
+		s.CosmosUser = s.CreateAndFundCosmosUser(ctx, s.Acme)
 
 		s.prover = os.Getenv(testvalues.EnvKeySp1Prover)
 		switch s.prover {
@@ -141,7 +141,7 @@ func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType t
 			os.Setenv(testvalues.EnvKeyRustLog, testvalues.EnvValueRustLog_Info)
 		}
 		os.Setenv(testvalues.EnvKeyEthRPC, eth.RPC)
-		os.Setenv(testvalues.EnvKeyTendermintRPC, s.Wfchain.GetHostRPCAddress())
+		os.Setenv(testvalues.EnvKeyTendermintRPC, s.Acme.GetHostRPCAddress())
 		os.Setenv(testvalues.EnvKeySp1Prover, s.prover)
 		os.Setenv(testvalues.EnvKeyOperatorPrivateKey, hex.EncodeToString(crypto.FromECDSA(operatorKey)))
 	}))
@@ -206,8 +206,8 @@ func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType t
 		config := proofapi.NewConfigBuilder().
 			EthToCosmosAttested(proofapi.EthToCosmosAttestedParams{
 				EthChainID:        eth.ChainID.String(),
-				CosmosChainID:     s.Wfchain.Config().ChainID,
-				TmRPC:             s.Wfchain.GetHostRPCAddress(),
+				CosmosChainID:     s.Acme.Config().ChainID,
+				TmRPC:             s.Acme.GetHostRPCAddress(),
 				ICS26Address:      s.contractAddresses.Ics26Router,
 				EthRPC:            eth.RPC,
 				SignerAddress:     s.CosmosRelayerSubmitter.FormattedAddress(),
@@ -216,9 +216,9 @@ func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType t
 				QuorumThreshold:   testvalues.DefaultMinRequiredSigs,
 			}).
 			CosmosToEthSP1(proofapi.CosmosToEthSP1Params{
-				CosmosChainID:       s.Wfchain.Config().ChainID,
+				CosmosChainID:       s.Acme.Config().ChainID,
 				EthChainID:          eth.ChainID.String(),
-				TmRPC:               s.Wfchain.GetHostRPCAddress(),
+				TmRPC:               s.Acme.GetHostRPCAddress(),
 				ICS26Address:        s.contractAddresses.Ics26Router,
 				IBCMulticallAddress: s.contractAddresses.IbcMulticall,
 				EthRPC:              eth.RPC,
@@ -251,12 +251,12 @@ func (s *CosmosEthereumIFTTestSuite) SetupSuite(ctx context.Context, proofType t
 
 	s.Require().True(s.Run("Verify Proof API Info", func() {
 		info, err := s.ProofApiClient.Info(ctx, &proofapitypes.InfoRequest{
-			SrcChain: s.Wfchain.Config().ChainID,
+			SrcChain: s.Acme.Config().ChainID,
 			DstChain: eth.ChainID.String(),
 		})
 		s.Require().NoError(err)
 		s.Require().NotNil(info)
-		s.Require().Equal(s.Wfchain.Config().ChainID, info.SourceChain.ChainId)
+		s.Require().Equal(s.Acme.Config().ChainID, info.SourceChain.ChainId)
 		s.Require().Equal(eth.ChainID.String(), info.TargetChain.ChainId)
 	}))
 }
@@ -266,10 +266,10 @@ func (s *CosmosEthereumIFTTestSuite) Test_Deploy() {
 	s.SetupSuite(ctx, types.ProofTypeGroth16)
 
 	s.Require().True(s.Run("Verify Cosmos chain is running", func() {
-		height, err := s.Wfchain.Height(ctx)
+		height, err := s.Acme.Height(ctx)
 		s.Require().NoError(err)
 		s.Require().Greater(height, int64(0))
-		s.T().Logf("Wfchain height: %d", height)
+		s.T().Logf("Acme height: %d", height)
 	}))
 
 	s.Require().True(s.Run("Verify Ethereum chain is running", func() {
@@ -281,7 +281,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_Deploy() {
 
 	s.Require().True(s.Run("Verify Proof API Info Cosmos->Eth", func() {
 		info, err := s.ProofApiClient.Info(ctx, &proofapitypes.InfoRequest{
-			SrcChain: s.Wfchain.Config().ChainID,
+			SrcChain: s.Acme.Config().ChainID,
 			DstChain: s.Eth.Chains[0].ChainID.String(),
 		})
 		s.Require().NoError(err)
@@ -291,14 +291,14 @@ func (s *CosmosEthereumIFTTestSuite) Test_Deploy() {
 	s.Require().True(s.Run("Verify Proof API Info Eth->Cosmos", func() {
 		info, err := s.ProofApiClient.Info(ctx, &proofapitypes.InfoRequest{
 			SrcChain: s.Eth.Chains[0].ChainID.String(),
-			DstChain: s.Wfchain.Config().ChainID,
+			DstChain: s.Acme.Config().ChainID,
 		})
 		s.Require().NoError(err)
 		s.Require().NotNil(info)
 	}))
 
 	s.Require().True(s.Run("Verify IFT module on Cosmos", func() {
-		resp, err := e2esuite.GRPCQuery[ifttypes.QueryParamsResponse](ctx, s.Wfchain, &ifttypes.QueryParamsRequest{})
+		resp, err := e2esuite.GRPCQuery[ifttypes.QueryParamsResponse](ctx, s.Acme, &ifttypes.QueryParamsRequest{})
 		s.Require().NoError(err)
 		s.Require().NotNil(resp)
 	}))
@@ -336,7 +336,7 @@ func (s *CosmosEthereumIFTTestSuite) setupIFTInfrastructure(ctx context.Context,
 			var createClientTxBodyBz []byte
 			s.Require().True(s.Run("Retrieve create client tx", func() {
 				resp, err := s.ProofApiClient.CreateClient(ctx, &proofapitypes.CreateClientRequest{
-					SrcChain: s.Wfchain.Config().ChainID,
+					SrcChain: s.Acme.Config().ChainID,
 					DstChain: eth.ChainID.String(),
 					Parameters: map[string]string{
 						testvalues.ParameterKey_Sp1Verifier: verifierAddress,
@@ -384,7 +384,7 @@ func (s *CosmosEthereumIFTTestSuite) setupIFTInfrastructure(ctx context.Context,
 
 				resp, err := s.ProofApiClient.CreateClient(ctx, &proofapitypes.CreateClientRequest{
 					SrcChain:   eth.ChainID.String(),
-					DstChain:   s.Wfchain.Config().ChainID,
+					DstChain:   s.Acme.Config().ChainID,
 					Parameters: parameters,
 				})
 				s.Require().NoError(err)
@@ -393,7 +393,7 @@ func (s *CosmosEthereumIFTTestSuite) setupIFTInfrastructure(ctx context.Context,
 			}))
 
 			s.Require().True(s.Run("Broadcast relay tx", func() {
-				resp := s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 20_000_000, createClientTxBodyBz)
+				resp := s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 20_000_000, createClientTxBodyBz)
 				clientId, err := cosmos.GetEventValue(resp.Events, clienttypes.EventTypeCreateClient, clienttypes.AttributeKeyClientID)
 				s.Require().NoError(err)
 				s.Require().Equal(tc.ethClientIDOnCosmos, clientId)
@@ -423,7 +423,7 @@ func (s *CosmosEthereumIFTTestSuite) setupIFTInfrastructure(ctx context.Context,
 		s.Require().True(s.Run("Register counterparty on Cosmos", func() {
 			merklePathPrefix := [][]byte{[]byte("")}
 
-			_, err := s.BroadcastMessages(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 200_000, &clienttypesv2.MsgRegisterCounterparty{
+			_, err := s.BroadcastMessages(ctx, s.Acme, s.CosmosRelayerSubmitter, 200_000, &clienttypesv2.MsgRegisterCounterparty{
 				ClientId:                 tc.ethClientIDOnCosmos,
 				CounterpartyMerklePrefix: merklePathPrefix,
 				CounterpartyClientId:     tc.tmClientID,
@@ -493,7 +493,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 
 	s.Require().True(s.Run("Mint tokens to user on Cosmos", func() {
 		s.mintTokensOnCosmos(ctx, s.CosmosRelayerSubmitter, tc.cosmosDenom, transferAmount, s.CosmosUser.FormattedAddress())
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.Equal(transferAmount))
 	}))
@@ -517,7 +517,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 			)
 			s.Require().NotEmpty(cosmosSendTxHash)
 
-			balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+			balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 			s.Require().NoError(err)
 			s.Require().True(balance.IsZero())
 		}))
@@ -534,7 +534,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 			s.Require().NoError(err)
 
 			resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
-				SrcChain:    s.Wfchain.Config().ChainID,
+				SrcChain:    s.Acme.Config().ChainID,
 				DstChain:    eth.ChainID.String(),
 				SourceTxIds: [][]byte{sendTxHashBytes},
 				SrcClientId: tc.ethClientIDOnCosmos,
@@ -561,7 +561,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 		s.Require().True(s.Run("Relay ack to Cosmos", func() {
 			resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
 				SrcChain:    eth.ChainID.String(),
-				DstChain:    s.Wfchain.Config().ChainID,
+				DstChain:    s.Acme.Config().ChainID,
 				SourceTxIds: [][]byte{cosmosRecvTxHash},
 				SrcClientId: tc.tmClientID,
 				DstClientId: tc.ethClientIDOnCosmos,
@@ -569,7 +569,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 			s.Require().NoError(err)
 			s.Require().NotEmpty(resp.Tx)
 
-			_ = s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
+			_ = s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
 		}))
 
 		s.Require().True(s.Run("Verify pending transfer cleared on Cosmos", func() {
@@ -611,7 +611,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 		s.Require().True(s.Run("Relay packet to Cosmos", func() {
 			resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
 				SrcChain:    eth.ChainID.String(),
-				DstChain:    s.Wfchain.Config().ChainID,
+				DstChain:    s.Acme.Config().ChainID,
 				SourceTxIds: [][]byte{ethSendTxHash},
 				SrcClientId: tc.tmClientID,
 				DstClientId: tc.ethClientIDOnCosmos,
@@ -619,11 +619,11 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 			s.Require().NoError(err)
 			s.Require().NotEmpty(resp.Tx)
 
-			cosmosRecvTxResponse = s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
+			cosmosRecvTxResponse = s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
 		}))
 
 		s.Require().True(s.Run("Verify balance on Cosmos", func() {
-			balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+			balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 			s.Require().NoError(err)
 			s.Require().True(balance.Equal(transferAmount), "Expected %s, got %s", transferAmount.String(), balance.String())
 		}))
@@ -633,7 +633,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 			s.Require().NoError(err)
 
 			resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
-				SrcChain:    s.Wfchain.Config().ChainID,
+				SrcChain:    s.Acme.Config().ChainID,
 				DstChain:    eth.ChainID.String(),
 				SourceTxIds: [][]byte{cosmosRecvTxHashBytes},
 				SrcClientId: tc.ethClientIDOnCosmos,
@@ -658,7 +658,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_Roundtrip() {
 
 	s.Require().True(s.Run("Verify final balances", func() {
 		s.Require().True(s.Run("Cosmos user has tokens back", func() {
-			balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+			balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 			s.Require().NoError(err)
 			s.Require().True(balance.Equal(transferAmount), "Cosmos user should have tokens back after roundtrip")
 		}))
@@ -687,7 +687,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_TimeoutCosmosToEthereum() 
 
 	s.Require().True(s.Run("Mint tokens to user on Cosmos", func() {
 		s.mintTokensOnCosmos(ctx, s.CosmosRelayerSubmitter, tc.cosmosDenom, transferAmount, s.CosmosUser.FormattedAddress())
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.Equal(transferAmount))
 	}))
@@ -708,7 +708,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_TimeoutCosmosToEthereum() 
 	}))
 
 	s.Require().True(s.Run("Verify balance burned on Cosmos", func() {
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.IsZero())
 	}))
@@ -731,7 +731,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_TimeoutCosmosToEthereum() 
 
 		resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
 			SrcChain:     eth.ChainID.String(),
-			DstChain:     s.Wfchain.Config().ChainID,
+			DstChain:     s.Acme.Config().ChainID,
 			TimeoutTxIds: [][]byte{sendTxHashBytes},
 			SrcClientId:  tc.tmClientID,
 			DstClientId:  tc.ethClientIDOnCosmos,
@@ -739,11 +739,11 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_TimeoutCosmosToEthereum() 
 		s.Require().NoError(err)
 		s.Require().NotEmpty(resp.Tx)
 
-		_ = s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
+		_ = s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
 	}))
 
 	s.Require().True(s.Run("Verify tokens refunded on Cosmos", func() {
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.Equal(transferAmount), "Expected %s (refunded), got %s", transferAmount.String(), balance.String())
 	}))
@@ -837,7 +837,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_TimeoutEthereumToCosmos() 
 
 	s.Require().True(s.Run("Relay timeout packet to Ethereum", func() {
 		resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
-			SrcChain:     s.Wfchain.Config().ChainID,
+			SrcChain:     s.Acme.Config().ChainID,
 			DstChain:     eth.ChainID.String(),
 			TimeoutTxIds: [][]byte{sendTxHash},
 			SrcClientId:  tc.ethClientIDOnCosmos,
@@ -883,7 +883,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnCosmos() {
 	tc := s.setupIFTInfrastructure(ctx, s.prover, s.proofType)
 
 	ethUserAddr := crypto.PubkeyToAddress(s.ethUser.PublicKey)
-	invalidCosmosAddr := "wf1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	invalidCosmosAddr := "acme1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 	s.Require().True(s.Run("Mint tokens on Ethereum", func() {
 		iftContract, err := evmift.NewContract(tc.ethIFTAddress, eth.RPCClient)
@@ -945,7 +945,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnCosmos() {
 	s.Require().True(s.Run("Relay packet to Cosmos (execution fails)", func() {
 		resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
 			SrcChain:    eth.ChainID.String(),
-			DstChain:    s.Wfchain.Config().ChainID,
+			DstChain:    s.Acme.Config().ChainID,
 			SourceTxIds: [][]byte{sendTxHash},
 			SrcClientId: tc.tmClientID,
 			DstClientId: tc.ethClientIDOnCosmos,
@@ -953,12 +953,12 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnCosmos() {
 		s.Require().NoError(err)
 		s.Require().NotEmpty(resp.Tx)
 
-		cosmosRecvTxResponse := s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
+		cosmosRecvTxResponse := s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
 		recvTxHash = cosmosRecvTxResponse.TxHash
 	}))
 
 	s.Require().True(s.Run("Verify no balance minted on Cosmos", func() {
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), tc.cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.IsZero(), "Cosmos user should have no tokens")
 	}))
@@ -968,7 +968,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnCosmos() {
 		s.Require().NoError(err)
 
 		resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
-			SrcChain:    s.Wfchain.Config().ChainID,
+			SrcChain:    s.Acme.Config().ChainID,
 			DstChain:    eth.ChainID.String(),
 			SourceTxIds: [][]byte{recvTxHashBytes},
 			SrcClientId: tc.ethClientIDOnCosmos,
@@ -1026,7 +1026,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 			s.Require().NoError(err)
 
 			resp, err := s.ProofApiClient.CreateClient(ctx, &proofapitypes.CreateClientRequest{
-				SrcChain: s.Wfchain.Config().ChainID,
+				SrcChain: s.Acme.Config().ChainID,
 				DstChain: eth.ChainID.String(),
 				Parameters: map[string]string{
 					testvalues.ParameterKey_Sp1Verifier: verifierAddress,
@@ -1059,7 +1059,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 
 			resp, err := s.ProofApiClient.CreateClient(ctx, &proofapitypes.CreateClientRequest{
 				SrcChain: eth.ChainID.String(),
-				DstChain: s.Wfchain.Config().ChainID,
+				DstChain: s.Acme.Config().ChainID,
 				Parameters: map[string]string{
 					testvalues.ParameterKey_AttestorAddresses: attestorAddresses,
 					testvalues.ParameterKey_MinRequiredSigs:   strconv.Itoa(testvalues.DefaultMinRequiredSigs),
@@ -1070,7 +1070,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 			s.Require().NoError(err)
 			s.Require().NotEmpty(resp.Tx)
 
-			_ = s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 20_000_000, resp.Tx)
+			_ = s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 20_000_000, resp.Tx)
 		}))
 
 		s.Require().True(s.Run("Add client and counterparty on Ethereum", func() {
@@ -1096,7 +1096,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 		s.Require().True(s.Run("Register counterparty on Cosmos", func() {
 			merklePathPrefix := [][]byte{[]byte("")}
 
-			_, err := s.BroadcastMessages(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 200_000, &clienttypesv2.MsgRegisterCounterparty{
+			_, err := s.BroadcastMessages(ctx, s.Acme, s.CosmosRelayerSubmitter, 200_000, &clienttypesv2.MsgRegisterCounterparty{
 				ClientId:                 ethClientIDOnCosmos,
 				CounterpartyMerklePrefix: merklePathPrefix,
 				CounterpartyClientId:     tmClientID,
@@ -1129,7 +1129,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 
 	s.Require().True(s.Run("Mint tokens to user on Cosmos", func() {
 		s.mintTokensOnCosmos(ctx, s.CosmosRelayerSubmitter, cosmosDenom, transferAmount, s.CosmosUser.FormattedAddress())
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.Equal(transferAmount))
 	}))
@@ -1150,7 +1150,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 	}))
 
 	s.Require().True(s.Run("Verify balance burned on Cosmos", func() {
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.IsZero())
 	}))
@@ -1168,7 +1168,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 		s.Require().NoError(err)
 
 		resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
-			SrcChain:    s.Wfchain.Config().ChainID,
+			SrcChain:    s.Acme.Config().ChainID,
 			DstChain:    eth.ChainID.String(),
 			SourceTxIds: [][]byte{sendTxHashBytes},
 			SrcClientId: ethClientIDOnCosmos,
@@ -1195,7 +1195,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 	s.Require().True(s.Run("Relay error ack to Cosmos", func() {
 		resp, err := s.ProofApiClient.RelayByTx(ctx, &proofapitypes.RelayByTxRequest{
 			SrcChain:    eth.ChainID.String(),
-			DstChain:    s.Wfchain.Config().ChainID,
+			DstChain:    s.Acme.Config().ChainID,
 			SourceTxIds: [][]byte{recvTxHash},
 			SrcClientId: tmClientID,
 			DstClientId: ethClientIDOnCosmos,
@@ -1203,11 +1203,11 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 		s.Require().NoError(err)
 		s.Require().NotEmpty(resp.Tx)
 
-		_ = s.MustBroadcastSdkTxBody(ctx, s.Wfchain, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
+		_ = s.MustBroadcastSdkTxBody(ctx, s.Acme, s.CosmosRelayerSubmitter, 2_000_000, resp.Tx)
 	}))
 
 	s.Require().True(s.Run("Verify tokens refunded on Cosmos", func() {
-		balance, err := s.Wfchain.GetBalance(ctx, s.CosmosUser.FormattedAddress(), cosmosDenom)
+		balance, err := s.Acme.GetBalance(ctx, s.CosmosUser.FormattedAddress(), cosmosDenom)
 		s.Require().NoError(err)
 		s.Require().True(balance.Equal(transferAmount), "Expected %s (refunded), got %s", transferAmount.String(), balance.String())
 	}))
@@ -1222,7 +1222,7 @@ func (s *CosmosEthereumIFTTestSuite) Test_IFTTransfer_FailedReceiveOnEthereum() 
 
 func (s *CosmosEthereumIFTTestSuite) getIFTModuleAddress() string {
 	iftAddr := authtypes.NewModuleAddress(testvalues.IFTModuleName)
-	bech32Addr, err := sdk.Bech32ifyAddressBytes(s.Wfchain.Config().Bech32Prefix, iftAddr)
+	bech32Addr, err := sdk.Bech32ifyAddressBytes(s.Acme.Config().Bech32Prefix, iftAddr)
 	s.Require().NoError(err)
 	return bech32Addr
 }
@@ -1233,7 +1233,7 @@ func (s *CosmosEthereumIFTTestSuite) createTokenFactoryDenom(ctx context.Context
 		Denom:  denom,
 	}
 
-	_, err := s.BroadcastMessages(ctx, s.Wfchain, user, 200_000, msg)
+	_, err := s.BroadcastMessages(ctx, s.Acme, user, 200_000, msg)
 	s.Require().NoError(err)
 
 	return denom
@@ -1246,12 +1246,12 @@ func (s *CosmosEthereumIFTTestSuite) mintTokensOnCosmos(ctx context.Context, use
 		Amount:  sdk.Coin{Denom: denom, Amount: amount},
 	}
 
-	_, err := s.BroadcastMessages(ctx, s.Wfchain, user, 200_000, msg)
+	_, err := s.BroadcastMessages(ctx, s.Acme, user, 200_000, msg)
 	s.Require().NoError(err)
 }
 
 func (s *CosmosEthereumIFTTestSuite) registerIFTBridgeOnCosmos(ctx context.Context, user ibc.Wallet, denom, clientId, counterpartyIftAddr, constructor string) {
-	govModuleAddr, err := s.Wfchain.AuthQueryModuleAddress(ctx, govtypes.ModuleName)
+	govModuleAddr, err := s.Acme.AuthQueryModuleAddress(ctx, govtypes.ModuleName)
 	s.Require().NoError(err)
 
 	msg := &ifttypes.MsgRegisterIFTBridge{
@@ -1262,7 +1262,7 @@ func (s *CosmosEthereumIFTTestSuite) registerIFTBridgeOnCosmos(ctx context.Conte
 		IftSendCallConstructor: constructor,
 	}
 
-	err = s.ExecuteGovV1Proposal(ctx, msg, s.Wfchain, user)
+	err = s.ExecuteGovV1Proposal(ctx, msg, s.Acme, user)
 	s.Require().NoError(err)
 }
 
@@ -1276,14 +1276,14 @@ func (s *CosmosEthereumIFTTestSuite) iftTransferFromCosmos(ctx context.Context, 
 		TimeoutTimestamp: timeoutTimestamp,
 	}
 
-	resp, err := s.BroadcastMessages(ctx, s.Wfchain, user, 200_000, msg)
+	resp, err := s.BroadcastMessages(ctx, s.Acme, user, 200_000, msg)
 	s.Require().NoError(err)
 
 	return resp.TxHash
 }
 
 func (s *CosmosEthereumIFTTestSuite) queryPendingTransferOnCosmos(ctx context.Context, denom, clientId string, sequence uint64) (*ifttypes.PendingTransfer, error) {
-	resp, err := e2esuite.GRPCQuery[ifttypes.QueryPendingTransferResponse](ctx, s.Wfchain, &ifttypes.QueryPendingTransferRequest{
+	resp, err := e2esuite.GRPCQuery[ifttypes.QueryPendingTransferResponse](ctx, s.Acme, &ifttypes.QueryPendingTransferRequest{
 		Denom:    denom,
 		ClientId: clientId,
 		Sequence: sequence,

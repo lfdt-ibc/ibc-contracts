@@ -47,7 +47,7 @@ func IbcGoChainSpec(name, chainId string) *interchaintest.ChainSpec {
 	}
 }
 
-func WfchainChainSpec(name, chainId string) *interchaintest.ChainSpec {
+func AcmeChainSpec(name, chainId string) *interchaintest.ChainSpec {
 	return &interchaintest.ChainSpec{
 		ChainConfig: ibc.ChainConfig{
 			Type:    "cosmos",
@@ -55,18 +55,18 @@ func WfchainChainSpec(name, chainId string) *interchaintest.ChainSpec {
 			ChainID: chainId,
 			Images: []ibc.DockerImage{
 				{
-					Repository: "ghcr.io/cosmos/wfchain",
+					Repository: "ghcr.io/cosmos/acme",
 					Version:    "latest",
 					UIDGID:     "1025:1025",
 				},
 			},
-			Bin:            "wfchaind",
-			Bech32Prefix:   "wf",
+			Bin:            "acmed",
+			Bech32Prefix:   "acme",
 			Denom:          "stake",
 			GasPrices:      "0.00stake",
 			GasAdjustment:  1.5,
 			EncodingConfig: SDKEncodingConfig(),
-			ModifyGenesis:  wfchainModifyGenesis(),
+			ModifyGenesis:  acmeModifyGenesis(),
 			TrustingPeriod: "508h",
 			NoHostMount:    false,
 		},

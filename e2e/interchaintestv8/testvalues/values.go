@@ -89,6 +89,8 @@ const (
 	EnvValueProofType_Plonk = "plonk"
 	// EnvValueWasmLightClientTag_Local is the value to set to use the local Wasm light client binary.
 	EnvValueWasmLightClientTag_Local = "local"
+	// PreGloasWasmLightClientTag is the latest release of the Wasm light client without Gloas support.
+	PreGloasWasmLightClientTag = "cw-ics08-wasm-eth-v1.3.0"
 
 	// EthTestnetTypeAnvil uses local Anvil chain (supports dummy or attestor light client)
 	EthTestnetTypeAnvil = "anvil"
@@ -199,8 +201,8 @@ const (
 	// Recompute with: just compute-ift-addresses
 	DeterministicIFTAddress = "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d"
 	// DeterministicICAAddress is the Cosmos ICA address controlled by DeterministicIFTAddress.
-	// Recompute with: just compute-ift-addresses <E2EDeployerPrivateKeyHex> 20 attestations-0 wf
-	DeterministicICAAddress = "wf1nhvjnhsex0adxgdd5g7yfy7wnj6ezn4zjs652zeddp4drvwyeuuqt7gczu"
+	// Recompute with: just compute-ift-addresses <E2EDeployerPrivateKeyHex> 20 attestations-0 acme
+	DeterministicICAAddress = "acme1nhvjnhsex0adxgdd5g7yfy7wnj6ezn4zjs652zeddp4drvwyeuuqp6uf6n"
 	// EnvKeyIFTICAAddress is the env var for passing ICA address to the deploy script.
 	EnvKeyIFTICAAddress = "IFT_ICA_ADDRESS"
 	// SolanaLedgerDir is the path to the Solana ledger directory.

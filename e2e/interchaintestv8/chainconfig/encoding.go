@@ -3,6 +3,9 @@
 package chainconfig
 
 import (
+	ifttypes "github.com/cosmos/acme/x/ift/types"
+	tokenfactorytypes "github.com/cosmos/acme/x/tokenfactory/types"
+
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -35,8 +38,6 @@ import (
 
 	proposaltypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/paramsproposal"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/attestations"
-	ifttypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/wfchain/ift"
-	tokenfactorytypes "github.com/lfdt-ibc/ibc-contracts/e2e/v8/types/wfchain/tokenfactory"
 )
 
 // Codec returns the global E2E protobuf codec.
@@ -89,15 +90,15 @@ func codecAndEncodingConfig() (*codec.ProtoCodec, sdktestutil.TestEncodingConfig
 	authz.RegisterInterfaces(cfg.InterfaceRegistry)
 	txtypes.RegisterInterfaces(cfg.InterfaceRegistry)
 
-	// wfchain IFT and TokenFactory types
-	registerWfchainTypes(cfg.InterfaceRegistry)
+	// acme IFT and TokenFactory types
+	registerAcmeTypes(cfg.InterfaceRegistry)
 
 	cdc := codec.NewProtoCodec(cfg.InterfaceRegistry)
 	return cdc, cfg
 }
 
-// registerWfchainTypes registers wfchain IFT and TokenFactory message types
-func registerWfchainTypes(registry codectypes.InterfaceRegistry) {
+// registerAcmeTypes registers acme IFT and TokenFactory message types
+func registerAcmeTypes(registry codectypes.InterfaceRegistry) {
 	registry.RegisterImplementations((*sdk.Msg)(nil),
 		&ifttypes.MsgRegisterIFTBridge{},
 		&ifttypes.MsgRemoveIFTBridge{},
