@@ -6,13 +6,14 @@ import (
 	"fmt"
 
 	"github.com/cosmos/gogoproto/proto"
-	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 
 	gmptypes "github.com/lfdt-ibc/ibc-go/v11/modules/apps/27-gmp/types"
+
+	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
 
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/testvalues"
 )

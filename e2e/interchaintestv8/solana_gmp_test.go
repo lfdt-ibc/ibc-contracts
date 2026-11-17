@@ -16,7 +16,6 @@ import (
 	bin "github.com/gagliardetto/binary"
 	test_cpi_proxy "github.com/lfdt-ibc/ibc-contracts/e2e/interchaintestv8/solana/go-anchor/testcpiproxy"
 	test_gmp_app "github.com/lfdt-ibc/ibc-contracts/e2e/interchaintestv8/solana/go-anchor/testgmpapp"
-	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
 	"github.com/stretchr/testify/suite"
 	googleproto "google.golang.org/protobuf/proto"
 
@@ -40,6 +39,7 @@ import (
 	ics07_tendermint "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics07tendermint"
 	ics26_router "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics26router"
 	ics27_gmp "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics27gmp"
+	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
 
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/cosmos"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/e2esuite"

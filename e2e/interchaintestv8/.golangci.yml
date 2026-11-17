@@ -82,8 +82,7 @@ formatters:
         - prefix(github.com/lfdt-ibc/ibc-go)
         - prefix(github.com/CosmWasm/wasmd)
         - prefix(github.com/cosmos/interchaintest)
-        - prefix(github.com/lfdt-ibc/ibc-contracts/packages/go-abigen)
-        - prefix(github.com/lfdt-ibc/ibc-contracts/packages/go-anchor)
+        - prefix(github.com/lfdt-ibc/ibc-contracts/packages)
         - prefix(github.com/lfdt-ibc/ibc-contracts/e2e/v8)
       custom-order: true
   exclusions:

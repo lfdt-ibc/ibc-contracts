@@ -31,7 +31,6 @@ import (
 
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ics26router"
 	evmift "github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ift"
-
 	access_manager "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/accessmanager"
 	attestation "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/attestation"
 	ics26_router "github.com/lfdt-ibc/ibc-contracts/packages/go-anchor/ics26router"
