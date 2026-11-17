@@ -28,6 +28,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Fork pull requests have a read-only token, so only build their images.
+  PUSH_IMAGE: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
   image_name: proof-api
   image_tags: |
     # Latest, but only on main
@@ -64,6 +66,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Login to GitHub Container Registry
+        if: env.PUSH_IMAGE == 'true'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
@@ -88,7 +91,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build and push by digest
+      - name: Build image and optionally push by digest
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -96,18 +99,20 @@ jobs:
           file: ./programs/proof-api/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY_URL }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_URL }},push-by-digest=true,name-canonical=true,push=${{ env.PUSH_IMAGE }}
           # No layer cache: this workflow only runs on PRs and manual dispatch, so a main-only
           # cache would never be refreshed, and the builder stage copies the sources before
           # `cargo build`, so every source change rebuilds the expensive layer anyway.
 
       - name: Export digest
+        if: env.PUSH_IMAGE == 'true'
         run: |
           mkdir -p "${{ runner.temp }}/digests"
           digest="${{ steps.build.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
+        if: env.PUSH_IMAGE == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: digests-${{ env.PLATFORM_SLUG }}
@@ -116,6 +121,7 @@ jobs:
           retention-days: 1
 
   merge:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: build-proof-api
     runs-on: ubuntu-24.04
     permissions:
