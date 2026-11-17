@@ -10,13 +10,12 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/attestantio/go-eth2-client v0.27.1
 	github.com/cometbft/cometbft v0.40.0
-	github.com/cosmos/acme v0.0.0-20261116142739-bf533cf32665
+	github.com/cosmos/acme v0.0.0-20261117094800-77a3a40f2900
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5
 	github.com/cosmos/cosmos-sdk v0.55.0
 	github.com/cosmos/gogoproto v1.7.2
 	github.com/cosmos/ics23/go v0.11.0
 	github.com/cosmos/interchaintest/v11 v11.0.0-20261110145912-88ccd80e7b63
-	github.com/cosmos/solidity-ibc-eureka/packages/go-proto v0.0.0-20260403152650-2480eaf9d4a1
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-connections v0.8.1
 	github.com/ethereum/go-ethereum v1.17.8
@@ -27,6 +26,7 @@ require (
 	github.com/lfdt-ibc/ibc-contracts/e2e/interchaintestv8/solana/go-anchor v0.0.0-00010101000000-000000000000
 	github.com/lfdt-ibc/ibc-contracts/packages/go-abigen v0.0.0
 	github.com/lfdt-ibc/ibc-contracts/packages/go-anchor v0.0.0
+	github.com/lfdt-ibc/ibc-contracts/packages/go-proto v0.0.0-20261116115934-a22cf01a7a01
 	github.com/lfdt-ibc/ibc-go/modules/light-clients/08-wasm/v11 v11.0.0-20261110125909-dedba2bf40b0
 	github.com/lfdt-ibc/ibc-go/v11 v11.2.1-rc1.0.20261110125909-dedba2bf40b0
 	github.com/moby/moby v28.5.2+incompatible
@@ -436,3 +436,5 @@ replace github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alp
 replace github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 
 // this line is used by go-codegen # suite/module
+
+replace github.com/lfdt-ibc/ibc-contracts/packages/go-proto => ../../packages/go-proto

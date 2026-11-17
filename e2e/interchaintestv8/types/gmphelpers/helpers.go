@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cosmos/gogoproto/proto"
-	solanatypes "github.com/cosmos/solidity-ibc-eureka/packages/go-proto/solana"
+	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 

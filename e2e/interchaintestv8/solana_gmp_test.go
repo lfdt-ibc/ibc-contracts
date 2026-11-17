@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/cosmos/gogoproto/proto"
-	solanatypes "github.com/cosmos/solidity-ibc-eureka/packages/go-proto/solana"
 	bin "github.com/gagliardetto/binary"
 	test_cpi_proxy "github.com/lfdt-ibc/ibc-contracts/e2e/interchaintestv8/solana/go-anchor/testcpiproxy"
 	test_gmp_app "github.com/lfdt-ibc/ibc-contracts/e2e/interchaintestv8/solana/go-anchor/testgmpapp"
+	solanatypes "github.com/lfdt-ibc/ibc-contracts/packages/go-proto/solana"
 	"github.com/stretchr/testify/suite"
 	googleproto "google.golang.org/protobuf/proto"
 
