@@ -678,6 +678,7 @@ mod tests {
 
             let mut env = mock_env();
 
+            let first_header_bz = client_msgs[0].clone();
             for header_bz in client_msgs {
                 let header: Header = serde_json::from_slice(&header_bz).unwrap();
                 env.block.time = Timestamp::from_seconds(
@@ -706,6 +707,19 @@ mod tests {
                     update_state_result.heights[0].revision_height
                 );
             }
+
+            // The first header is no longer valid, because the consensus state of its trusted slot
+            // is in an earlier sync committee period than the latest slot.
+            let query_verify_client_msg = QueryMsg::VerifyClientMessage(VerifyClientMessageMsg {
+                client_message: Binary::from(first_header_bz),
+            });
+            let err = query(deps.as_ref(), env.clone(), query_verify_client_msg).unwrap_err();
+            assert!(matches!(
+                err,
+                ContractError::VerifyClientMessageFailed(
+                    EthereumIBCError::TrustedPeriodMustBeEqualToLatestPeriod { .. }
+                )
+            ));
 
             // The client has now been updated, and we would submit the packet to the cosmos chain,
             // along with the proof of th packet commitment. IBC will call verify_membership.

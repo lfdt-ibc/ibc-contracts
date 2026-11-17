@@ -205,6 +205,19 @@ pub fn validate_light_client_update<V: BlsVerify>(
     let signature_period =
         client_state.compute_sync_committee_period_at_slot(update.signature_slot);
 
+    // The update must be trusted against a consensus state in the sync committee period of the
+    // latest slot. Otherwise, the sync committee of an earlier period could still sign updates,
+    // long after its members stopped being accountable for them.
+    let latest_period =
+        client_state.compute_sync_committee_period_at_slot(client_state.latest_slot);
+    ensure!(
+        stored_period == latest_period,
+        EthereumIBCError::TrustedPeriodMustBeEqualToLatestPeriod {
+            trusted_period: stored_period,
+            latest_period,
+        }
+    );
+
     let is_next_sync_committee_known = trusted_consensus_state.next_sync_committee().is_some();
     if is_next_sync_committee_known {
         ensure!(
@@ -432,5 +445,66 @@ mod test {
             bls_verifier,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_verify_header_trusted_period_must_be_latest_period() {
+        let fixture: fixtures::StepsFixture =
+            fixtures::load("Test_MultiPeriodClientUpdateToCosmos");
+
+        let initial_state: InitialState = fixture.get_data_at_step(0);
+
+        let client_state = initial_state.client_state;
+        let consensus_state = initial_state.consensus_state;
+
+        let relayer_messages: RelayerMessages = fixture.get_data_at_step(1);
+        let (update_client_msgs, _, _, _) = relayer_messages.get_sdk_msgs();
+        let client_msg = ClientMessage::decode(
+            update_client_msgs[0]
+                .client_message
+                .clone()
+                .unwrap()
+                .value
+                .as_slice(),
+        )
+        .unwrap();
+        let header: Header = serde_json::from_slice(client_msg.data.as_slice()).unwrap();
+
+        let current_timestamp =
+            client_state.compute_timestamp_at_slot(header.consensus_update.signature_slot) + 1000;
+
+        // The header is valid while its trusted slot is in the period of the latest slot.
+        verify_header(
+            &consensus_state,
+            &client_state,
+            current_timestamp,
+            &header,
+            TestBlsVerifier,
+        )
+        .unwrap();
+
+        // The same header is rejected once the latest slot is in the next period.
+        let trusted_period =
+            client_state.compute_sync_committee_period_at_slot(header.trusted_slot);
+        let client_state = ClientState {
+            latest_slot: client_state.latest_slot
+                + client_state.slots_per_epoch * client_state.epochs_per_sync_committee_period,
+            ..client_state
+        };
+        let err = verify_header(
+            &consensus_state,
+            &client_state,
+            current_timestamp,
+            &header,
+            TestBlsVerifier,
+        )
+        .unwrap_err();
+        assert_eq!(
+            err,
+            EthereumIBCError::TrustedPeriodMustBeEqualToLatestPeriod {
+                trusted_period,
+                latest_period: trusted_period + 1,
+            }
+        );
     }
 }

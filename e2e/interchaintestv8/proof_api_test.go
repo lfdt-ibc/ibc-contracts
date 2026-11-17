@@ -1413,13 +1413,52 @@ func (s *ProofAPITestSuite) Test_UpdateClientToCosmos() {
 	}))
 }
 
+// UpdateClientAtPeriodStart waits until the first epoch of a sync committee period is finalized and
+// updates the Ethereum light client on Cosmos to it. The light client only accepts updates that are
+// trusted against a consensus state in the sync committee period of its latest slot, so this leaves
+// the rest of the period for relay txs that are broadcast after the client has been updated past
+// their trusted slot.
+func (s *ProofAPITestSuite) UpdateClientAtPeriodStart(ctx context.Context) {
+	eth, simd := s.Eth.Chains[0], s.Cosmos.Chains[0]
+
+	_, ethClientState := s.GetEthereumClientState(ctx, simd, testvalues.FirstWasmClientID)
+	period := ethClientState.EpochsPerSyncCommitteePeriod * ethClientState.SlotsPerEpoch
+
+	err := testutil.WaitForCondition(30*time.Minute, 5*time.Second, func() (bool, error) {
+		resp, err := eth.BeaconAPIClient.GetFinalityUpdate()
+		if err != nil {
+			return false, err
+		}
+
+		finalizedSlot, err := strconv.ParseUint(resp.Data.FinalizedHeader.Beacon.Slot, 10, 64)
+		if err != nil {
+			return false, err
+		}
+
+		return finalizedSlot > ethClientState.LatestSlot && finalizedSlot%period < ethClientState.SlotsPerEpoch, nil
+	})
+	s.Require().NoError(err)
+
+	resp, err := s.ProofApiClient.UpdateClient(context.Background(), &proofapitypes.UpdateClientRequest{
+		SrcChain:    eth.ChainID.String(),
+		DstChain:    simd.Config().ChainID,
+		DstClientId: testvalues.FirstWasmClientID,
+	})
+	s.Require().NoError(err)
+	s.Require().NotEmpty(resp.Tx)
+
+	_ = s.MustBroadcastSdkTxBody(ctx, simd, s.SimdRelayerSubmitter, 2_000_000, resp.Tx)
+}
+
 // Test_HistoricalUpdateClientToCosmos tests updating the eth light client with updates that are not the latest
 // To do this, we will:
-// 1. Send a transfer on Ethereum
-// 2. Retrieve the relay tx from the relayer
-// 3. Wait until we have a finalized block that is past the update in the relay tx
-// 4. Update the client with the finalized block that is past the update in the relay tx
-// 5. Finally, we will relay the transfer tx, together with the historical update client
+// 1. Update the client at the start of a sync committee period, since the historical update must be
+// trusted against a consensus state in the sync committee period of the latest slot
+// 2. Send a transfer on Ethereum
+// 3. Retrieve the relay tx from the relayer
+// 4. Wait until we have a finalized block that is past the update in the relay tx
+// 5. Update the client with the finalized block that is past the update in the relay tx
+// 6. Finally, we will relay the transfer tx, together with the historical update client
 func (s *ProofAPITestSuite) Test_HistoricalUpdateClientToCosmos() {
 	if os.Getenv(testvalues.EnvKeyEthTestnetType) != testvalues.EthTestnetTypePoS {
 		s.T().Skip("Test is only relevant for PoS networks")
@@ -1447,6 +1486,10 @@ func (s *ProofAPITestSuite) Test_HistoricalUpdateClientToCosmos() {
 		receipt, err := eth.GetTxReciept(ctx, tx.Hash())
 		s.Require().NoError(err)
 		s.Require().Equal(ethtypes.ReceiptStatusSuccessful, receipt.Status)
+	}))
+
+	s.Require().True(s.Run("Update the client at the start of a sync committee period", func() {
+		s.UpdateClientAtPeriodStart(ctx)
 	}))
 
 	var sendTxHash []byte
@@ -1777,6 +1820,14 @@ func (s *ProofAPITestSuite) ConcurrentRecvPacketToCosmos(
 			s.Require().Equal(totalTransferAmount, escrowBalance)
 		}))
 	}))
+
+	if os.Getenv(testvalues.EnvKeyEthTestnetType) == testvalues.EthTestnetTypePoS {
+		// The relay txs below are all built against the same latest slot, and must be broadcast
+		// before the client is updated to the next sync committee period.
+		s.Require().True(s.Run("Update the client at the start of a sync committee period", func() {
+			s.UpdateClientAtPeriodStart(ctx)
+		}))
+	}
 
 	s.Require().True(s.Run("Relay the last packet", func() {
 		relayResp, err := s.ProofApiClient.RelayByTx(context.Background(), &proofapitypes.RelayByTxRequest{

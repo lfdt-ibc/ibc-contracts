@@ -176,6 +176,15 @@ pub enum EthereumIBCError {
     #[error("client's store period must be equal to update's finalized period")]
     StorePeriodMustBeEqualToFinalizedPeriod,
 
+    #[error(
+        "trusted consensus state must be in the sync committee period of the latest slot: \
+        trusted period: {trusted_period}, latest period: {latest_period}"
+    )]
+    TrustedPeriodMustBeEqualToLatestPeriod {
+        trusted_period: u64,
+        latest_period: u64,
+    },
+
     #[error("failed to compute slot at timestamp with  \
         (timestamp ({timestamp}) - genesis ({genesis})) / seconds_per_slot ({seconds_per_slot}) + genesis_slot ({genesis_slot})"
     )]
