@@ -120,7 +120,7 @@ func (s *IbcEurekaTestSuite) getEthLcClientIDOnCosmos() string {
 }
 
 // SetupSuite calls the underlying TestSuite's SetupSuite method
-// and deploys the IbcEureka contracts
+// and deploys the IBC contracts
 func (s *IbcEurekaTestSuite) SetupSuite(ctx context.Context, proofType types.SupportedProofType) {
 	s.TestSuite.SetupSuite(ctx)
 

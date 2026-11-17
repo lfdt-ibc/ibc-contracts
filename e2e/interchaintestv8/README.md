@@ -72,7 +72,7 @@ just test-e2e TestWithIbcEurekaTestSuite/Test_ICS20TransferERC20TokenfromEthereu
 
 ## Focused Besu ↔ Besu e2e
 
-This focused suite starts two independent Besu networks, deploys Eureka contracts on both, starts the proof API with the `besu_to_eth` module in both directions, deploys and registers Besu light clients on both chains, and uses real Besu proofs to verify A → B ICS20 transfers (with the B → A acknowledgement relay), timeouts and error acknowledgements, misbehaviour that freezes the client, and validator set changes.
+This focused suite starts two independent Besu networks, deploys the IBC contracts on both, starts the proof API with the `besu_to_eth` module in both directions, deploys and registers Besu light clients on both chains, and uses real Besu proofs to verify A → B ICS20 transfers (with the B → A acknowledgement relay), timeouts and error acknowledgements, misbehaviour that freezes the client, and validator set changes.
 
 Every test runs once per consensus protocol: the `_QBFT` variant starts QBFT networks and the `_IBFT2` variant starts IBFT 2.0 networks. Each test starts its own networks and proof API.
 
