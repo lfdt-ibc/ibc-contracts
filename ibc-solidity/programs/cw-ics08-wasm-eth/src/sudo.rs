@@ -3,7 +3,7 @@
 //! This module contains the sudo message handlers
 
 use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut};
-use ethereum_light_client::update::update_consensus_state;
+use ethereum_light_client::{header::Header, update::update_consensus_state};
 use ibc_proto::ibc::{
     core::client::v1::Height as IbcProtoHeight,
     lightclients::wasm::v1::ConsensusState as WasmConsensusState,
@@ -96,11 +96,11 @@ pub fn update_state(
     update_state_msg: UpdateStateMsg,
 ) -> Result<Binary, ContractError> {
     let header_bz: Vec<u8> = update_state_msg.client_message.into();
-    let header = serde_json::from_slice(&header_bz)
+    let header: Header = serde_json::from_slice(&header_bz)
         .map_err(ContractError::DeserializeClientMessageFailed)?;
 
     let eth_client_state = get_eth_client_state(deps.storage)?;
-    let eth_consensus_state = get_eth_consensus_state(deps.storage, eth_client_state.latest_slot)?;
+    let eth_consensus_state = get_eth_consensus_state(deps.storage, header.trusted_slot)?;
 
     let (updated_slot, updated_consensus_state, updated_client_state) =
         update_consensus_state(eth_consensus_state, eth_client_state, header)

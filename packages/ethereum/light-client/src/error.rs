@@ -210,16 +210,6 @@ pub enum EthereumIBCError {
         consensus_state_slot: u64,
         update_finalized_slot: u64,
     },
-
-    #[error(
-        "client and consensus slot mismatch: \
-        client state slot: {client_state_slot}, \
-        consensus state slot: {consensus_state_slot}"
-    )]
-    ClientAndConsensusSlotMismatch {
-        client_state_slot: u64,
-        consensus_state_slot: u64,
-    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
