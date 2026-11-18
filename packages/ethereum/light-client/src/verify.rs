@@ -57,6 +57,21 @@ pub fn verify_header<V: BlsVerify>(
     header: &Header,
     bls_verifier: V,
 ) -> Result<(), EthereumIBCError> {
+    // The header must be trusted against a consensus state in the sync committee period of the
+    // latest slot. Otherwise, the sync committee of an earlier period could still sign headers,
+    // long after its members stopped being accountable for them. Misbehaviours are not restricted,
+    // so that evidence against the sync committee of an earlier period can still freeze the client.
+    let trusted_period = client_state.compute_sync_committee_period_at_slot(consensus_state.slot);
+    let latest_period =
+        client_state.compute_sync_committee_period_at_slot(client_state.latest_slot);
+    ensure!(
+        trusted_period == latest_period,
+        EthereumIBCError::TrustedPeriodMustBeEqualToLatestPeriod {
+            trusted_period,
+            latest_period,
+        }
+    );
+
     let trusted_consensus_state = TrustedConsensusState::new(
         client_state,
         consensus_state.clone(),
@@ -204,19 +219,6 @@ pub fn validate_light_client_update<V: BlsVerify>(
         .compute_sync_committee_period_at_slot(trusted_consensus_state.finalized_slot());
     let signature_period =
         client_state.compute_sync_committee_period_at_slot(update.signature_slot);
-
-    // The update must be trusted against a consensus state in the sync committee period of the
-    // latest slot. Otherwise, the sync committee of an earlier period could still sign updates,
-    // long after its members stopped being accountable for them.
-    let latest_period =
-        client_state.compute_sync_committee_period_at_slot(client_state.latest_slot);
-    ensure!(
-        stored_period == latest_period,
-        EthereumIBCError::TrustedPeriodMustBeEqualToLatestPeriod {
-            trusted_period: stored_period,
-            latest_period,
-        }
-    );
 
     let is_next_sync_committee_known = trusted_consensus_state.next_sync_committee().is_some();
     if is_next_sync_committee_known {
