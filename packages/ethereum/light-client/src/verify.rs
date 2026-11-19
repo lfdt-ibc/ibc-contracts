@@ -47,11 +47,16 @@ pub trait BlsVerify {
 }
 
 /// Verifies the header of the light client.
+///
+/// * `consensus_state`: The trusted consensus state, at the trusted slot of the header.
+/// * `latest_consensus_state`: The consensus state at the latest slot of the client.
+///
 /// # Errors
 /// Returns an error if the header cannot be verified.
 #[allow(clippy::module_name_repetitions, clippy::needless_pass_by_value)]
 pub fn verify_header<V: BlsVerify>(
     consensus_state: &ConsensusState,
+    latest_consensus_state: &ConsensusState,
     client_state: &ClientState,
     current_timestamp: u64,
     header: &Header,
@@ -70,6 +75,15 @@ pub fn verify_header<V: BlsVerify>(
             trusted_period,
             latest_period,
         }
+    );
+
+    // The new consensus state is built from the trusted one, so the trusted consensus state must
+    // know the next sync committee if the latest one does. Otherwise, the latest consensus state
+    // could lose it, and the client couldn't be updated to the next period from there.
+    ensure!(
+        consensus_state.next_sync_committee.is_some()
+            || latest_consensus_state.next_sync_committee.is_none(),
+        EthereumIBCError::TrustedNextSyncCommitteeUnknown
     );
 
     let trusted_consensus_state = TrustedConsensusState::new(
@@ -441,6 +455,7 @@ mod test {
 
         verify_header(
             &consensus_state,
+            &consensus_state,
             &client_state,
             client_state.compute_timestamp_at_slot(header.consensus_update.signature_slot) + 1000,
             &header,
@@ -478,6 +493,7 @@ mod test {
         // The header is valid while its trusted slot is in the period of the latest slot.
         verify_header(
             &consensus_state,
+            &consensus_state,
             &client_state,
             current_timestamp,
             &header,
@@ -495,6 +511,7 @@ mod test {
         };
         let err = verify_header(
             &consensus_state,
+            &consensus_state,
             &client_state,
             current_timestamp,
             &header,
@@ -508,5 +525,47 @@ mod test {
                 latest_period: trusted_period + 1,
             }
         );
+    }
+
+    #[test]
+    fn test_verify_header_trusted_next_sync_committee_unknown() {
+        let fixture: fixtures::StepsFixture =
+            fixtures::load("Test_MultiPeriodClientUpdateToCosmos");
+
+        let initial_state: InitialState = fixture.get_data_at_step(0);
+
+        let client_state = initial_state.client_state;
+        let latest_consensus_state = initial_state.consensus_state;
+        assert!(latest_consensus_state.next_sync_committee.is_some());
+
+        let relayer_messages: RelayerMessages = fixture.get_data_at_step(1);
+        let (update_client_msgs, _, _, _) = relayer_messages.get_sdk_msgs();
+        let client_msg = ClientMessage::decode(
+            update_client_msgs[0]
+                .client_message
+                .clone()
+                .unwrap()
+                .value
+                .as_slice(),
+        )
+        .unwrap();
+        let header: Header = serde_json::from_slice(client_msg.data.as_slice()).unwrap();
+
+        // The header is rejected if its trusted consensus state doesn't know the next sync
+        // committee, while the latest one does.
+        let trusted_consensus_state = ConsensusState {
+            next_sync_committee: None,
+            ..latest_consensus_state.clone()
+        };
+        let err = verify_header(
+            &trusted_consensus_state,
+            &latest_consensus_state,
+            &client_state,
+            client_state.compute_timestamp_at_slot(header.consensus_update.signature_slot) + 1000,
+            &header,
+            TestBlsVerifier,
+        )
+        .unwrap_err();
+        assert_eq!(err, EthereumIBCError::TrustedNextSyncCommitteeUnknown);
     }
 }

@@ -185,6 +185,12 @@ pub enum EthereumIBCError {
         latest_period: u64,
     },
 
+    #[error(
+        "trusted consensus state must know the next sync committee, since the latest consensus \
+        state knows it"
+    )]
+    TrustedNextSyncCommitteeUnknown,
+
     #[error("failed to compute slot at timestamp with  \
         (timestamp ({timestamp}) - genesis ({genesis})) / seconds_per_slot ({seconds_per_slot}) + genesis_slot ({genesis_slot})"
     )]

@@ -300,7 +300,9 @@ mod tests {
         };
         use ibc_proto::{
             google::protobuf::Any,
-            ibc::lightclients::wasm::v1::{ClientMessage, ClientState as WasmClientState},
+            ibc::lightclients::wasm::v1::{
+                ClientMessage, ClientState as WasmClientState, ConsensusState as WasmConsensusState,
+            },
         };
         use prost::Message;
 
@@ -310,7 +312,10 @@ mod tests {
                 Height, InstantiateMsg, MerklePath, MigrateMsg, Migration, QueryMsg, SudoMsg,
                 UpdateStateMsg, UpdateStateResult, VerifyClientMessageMsg, VerifyMembershipMsg,
             },
-            state::HOST_CLIENT_STATE_KEY,
+            state::{
+                get_eth_client_state, get_eth_consensus_state, store_consensus_state,
+                HOST_CLIENT_STATE_KEY,
+            },
             test::helpers::mk_deps,
             ContractError,
         };
@@ -630,6 +635,95 @@ mod tests {
                     }
                 )
             ));
+        }
+
+        #[test]
+        fn test_update_from_trusted_consensus_state() {
+            let mut deps = mk_deps();
+            let creator = deps.api.addr_make("creator");
+            let info = message_info(&creator, &coins(1, "uatom"));
+
+            let fixture: StepsFixture = fixtures::load("Test_MultiPeriodClientUpdateToCosmos");
+
+            let initial_state: InitialState = fixture.get_data_at_step(0);
+            let trusted_consensus_state = initial_state.consensus_state;
+            assert!(trusted_consensus_state.next_sync_committee.is_some());
+
+            // The latest consensus state is in the period of the trusted one, but it doesn't know
+            // the next sync committee.
+            let latest_consensus_state = EthConsensusState {
+                slot: trusted_consensus_state.slot + 1,
+                next_sync_committee: None,
+                ..trusted_consensus_state.clone()
+            };
+            let client_state = EthClientState {
+                latest_slot: latest_consensus_state.slot,
+                ..initial_state.client_state
+            };
+
+            let msg = InstantiateMsg {
+                client_state: Binary::from(serde_json::to_vec(&client_state).unwrap()),
+                consensus_state: Binary::from(serde_json::to_vec(&latest_consensus_state).unwrap()),
+                checksum: b"checksum".into(),
+            };
+            instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+            store_consensus_state(
+                deps.as_mut().storage,
+                &WasmConsensusState {
+                    data: serde_json::to_vec(&trusted_consensus_state).unwrap(),
+                },
+                trusted_consensus_state.slot,
+            )
+            .unwrap();
+
+            // The first header of the fixture is trusted against the initial consensus state, and
+            // its finalized slot is in the next period.
+            let relayer_messages: RelayerMessages = fixture.get_data_at_step(1);
+            let (update_client_msgs, _, _, _) = relayer_messages.get_sdk_msgs();
+            let header_bz = ClientMessage::decode(
+                update_client_msgs[0]
+                    .client_message
+                    .clone()
+                    .unwrap()
+                    .value
+                    .as_slice(),
+            )
+            .unwrap()
+            .data;
+            let header: Header = serde_json::from_slice(&header_bz).unwrap();
+            assert_eq!(header.trusted_slot, trusted_consensus_state.slot);
+
+            let mut env = mock_env();
+            env.block.time = Timestamp::from_seconds(
+                client_state.compute_timestamp_at_slot(header.consensus_update.signature_slot)
+                    + 1000,
+            );
+
+            let query_verify_client_msg = QueryMsg::VerifyClientMessage(VerifyClientMessageMsg {
+                client_message: Binary::from(header_bz.clone()),
+            });
+            query(deps.as_ref(), env.clone(), query_verify_client_msg).unwrap();
+
+            // The update is built from the trusted consensus state. Building it from the latest
+            // one would fail, because it can't move to the next period.
+            let sudo_update_state_msg = SudoMsg::UpdateState(UpdateStateMsg {
+                client_message: Binary::from(header_bz),
+            });
+            sudo(deps.as_mut(), env, sudo_update_state_msg).unwrap();
+
+            let updated_slot = header.consensus_update.finalized_header.beacon().slot;
+            let updated_consensus_state =
+                get_eth_consensus_state(deps.as_ref().storage, updated_slot).unwrap();
+            assert_eq!(
+                Some(updated_consensus_state.current_sync_committee),
+                trusted_consensus_state.next_sync_committee
+            );
+            assert_eq!(
+                get_eth_client_state(deps.as_ref().storage)
+                    .unwrap()
+                    .latest_slot,
+                updated_slot
+            );
         }
 
         #[test]

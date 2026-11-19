@@ -36,9 +36,12 @@ pub fn verify_client_message(
     if let Ok(header) = serde_json::from_slice::<Header>(&verify_client_message_msg.client_message)
     {
         let eth_consensus_state = get_eth_consensus_state(deps.storage, header.trusted_slot)?;
+        let latest_eth_consensus_state =
+            get_eth_consensus_state(deps.storage, eth_client_state.latest_slot)?;
 
         ethereum_light_client::verify::verify_header(
             &eth_consensus_state,
+            &latest_eth_consensus_state,
             &eth_client_state,
             env.block.time.seconds(),
             &header,
