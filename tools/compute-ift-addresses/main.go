@@ -22,7 +22,7 @@ const (
 func main() {
 	if len(os.Args) < 5 {
 		fmt.Fprintf(os.Stderr, "Usage: %s <private-key-hex> <nonce> <client-id> <bech32-prefix> [salt]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Example: %s ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 18 08-wasm-0 wf\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Example: %s ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 20 attestations-0 acme\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nComputes the IFT contract address and its corresponding ICA address.\n")
 		os.Exit(1)
 	}
