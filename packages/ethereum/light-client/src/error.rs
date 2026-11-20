@@ -185,6 +185,12 @@ pub enum EthereumIBCError {
         latest_period: u64,
     },
 
+    #[error(
+        "trusted consensus state must know the next sync committee, since the latest consensus \
+        state knows it"
+    )]
+    TrustedNextSyncCommitteeUnknown,
+
     #[error("failed to compute slot at timestamp with  \
         (timestamp ({timestamp}) - genesis ({genesis})) / seconds_per_slot ({seconds_per_slot}) + genesis_slot ({genesis_slot})"
     )]
@@ -209,16 +215,6 @@ pub enum EthereumIBCError {
     InvalidUpdateSlot {
         consensus_state_slot: u64,
         update_finalized_slot: u64,
-    },
-
-    #[error(
-        "client and consensus slot mismatch: \
-        client state slot: {client_state_slot}, \
-        consensus state slot: {consensus_state_slot}"
-    )]
-    ClientAndConsensusSlotMismatch {
-        client_state_slot: u64,
-        consensus_state_slot: u64,
     },
 }
 
