@@ -1,0 +1,84 @@
+{
+    "version": "maru",
+    "execution_optimistic": false,
+    "finalized": false,
+    "data": {
+        "message": {
+            "slot": "911",
+            "proposer_index": "0x083e11f14b68d5ebeb4be3e3e0237ebbc5675ab5",
+            "parent_root": "0x725def2fd9353e601e4fb9baeef2fff33a8dc9cdef78b9805cce2f52051e5336",
+            "state_root": "0x1edeb4d3fd7f7dd42e7e49fd09d385ccf1db1ffec26db6e0b42ad7311a6f6a17",
+            "body": {
+                "randao_reveal": "0x",
+                "eth1_data": {
+                    "deposit_root": "0x",
+                    "deposit_count": "0",
+                    "block_hash": "0x"
+                },
+                "graffiti": "0x",
+                "proposer_slashings": [],
+                "attester_slashings": [],
+                "attestations": [
+                    {
+                        "aggregation_bits": "0x",
+                        "data": {
+                            "slot": "911",
+                            "index": "0",
+                            "beacon_block_root": "0xf58fb07623ceeda6611dc78c82de6d7790b60ee82cdea85cc2d5bb283dad3aee",
+                            "source": {
+                                "epoch": "0",
+                                "root": "0x"
+                            },
+                            "target": {
+                                "epoch": "0",
+                                "root": "0x"
+                            }
+                        },
+                        "signature": "0x78826ebd8cea60566baed26ecf47c8c035f40ee7c273be314237c8f36ff9aee36030ddff692bd05fea5505c41fa046350099109a442870c85e37804d1dcc4f3200"
+                    },
+                    {
+                        "aggregation_bits": "0x",
+                        "data": {
+                            "slot": "910",
+                            "index": "0",
+                            "beacon_block_root": "0x725def2fd9353e601e4fb9baeef2fff33a8dc9cdef78b9805cce2f52051e5336",
+                            "source": {
+                                "epoch": "0",
+                                "root": "0x"
+                            },
+                            "target": {
+                                "epoch": "0",
+                                "root": "0x"
+                            }
+                        },
+                        "signature": "0xc429e6d440d3efcacf637b0b357e9229c3fc172303412806f2c8a3c0ff72c9fd5f96b249afd08f9b707c0e60df7c05ba73dad9aa2932467f3f64d4a7a6fb3e1200"
+                    }
+                ],
+                "deposits": [],
+                "sync_aggregate": {
+                    "sync_committee_bits": "0x",
+                    "sync_committee_signature": "0x"
+                },
+                "execution_payload": {
+                    "parent_hash": "0x15e15aa6a6f1b727725e84e6af0cc2c5aedbbc958b1993cef97277bf5e96e23d",
+                    "fee_recipient": "0x0000000000000000000000000000000000000000",
+                    "state_root": "0x7adfea5526a96c188fd2b8ae42d96221ea501004917d0fdbb55904d8f8f2861c",
+                    "receipts_root": "0xf78dfb743fbd92ade140711c8bbc542b5e307f0ab7984eff35d751969fe57efa",
+                    "logs_bloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                    "prev_randao": "0x06ac453368e25826d9c361bc10d85640473ea798cfd291bed9715d49f80d8a4d",
+                    "block_number": "911",
+                    "gas_limit": "60000000",
+                    "gas_used": "21000",
+                    "timestamp": "1795163338",
+                    "extra_data": "0x626573752032362e342e30",
+                    "base_fee_per_gas": "7",
+                    "block_hash": "0xeedb8f16345e4ddaa19aa0da946f78a5b4291472e223e08a6559237d638d5c4e",
+                    "transactions": [
+                        "0x02f86482053980010f82520894000000000000000000000000000000000000dead0180c001a0165c00cba0407a1864b8160dc5542f447c6414073ac3b175de457ee10a74095aa079079582b46062be01af57ce13d43865d4e493c05a2a3da954326cc1c3420ed4"
+                    ]
+                }
+            }
+        },
+        "signature": "0x"
+    }
+}

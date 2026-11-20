@@ -8626,6 +8626,7 @@ dependencies = [
  "proof-api-eth-to-cosmos-compat",
  "proof-api-eth-to-eth",
  "proof-api-eth-to-solana",
+ "proof-api-linea-to-eth",
  "proof-api-solana-to-cosmos",
  "proof-api-solana-to-eth",
  "serde_json",
@@ -8900,6 +8901,25 @@ dependencies = [
  "tonic-build 0.13.1",
  "tracing",
  "tracing-opentelemetry",
+]
+
+[[package]]
+name = "proof-api-linea-to-eth"
+version = "0.1.0"
+dependencies = [
+ "alloy 2.0.4",
+ "anyhow",
+ "ethereum-apis 0.1.0",
+ "ibc-eureka-solidity-types 0.1.0",
+ "proof-api-core",
+ "proof-api-lib",
+ "reqwest 0.12.28",
+ "rlp 0.6.1",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tonic 0.13.1",
+ "tracing",
 ]
 
 [[package]]

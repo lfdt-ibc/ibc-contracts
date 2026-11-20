@@ -1,0 +1,21 @@
+{
+    "execution_optimistic": false,
+    "finalized": false,
+    "data": [
+        {
+            "index": "0",
+            "balance": "",
+            "status": "active_ongoing",
+            "validator": {
+                "pubkey": "0x083e11f14b68d5ebeb4be3e3e0237ebbc5675ab5",
+                "withdrawal_credentials": "0x",
+                "effective_balance": "",
+                "slashed": false,
+                "activation_eligibility_epoch": "",
+                "activation_epoch": "",
+                "exit_epoch": "",
+                "withdrawable_epoch": ""
+            }
+        }
+    ]
+}
