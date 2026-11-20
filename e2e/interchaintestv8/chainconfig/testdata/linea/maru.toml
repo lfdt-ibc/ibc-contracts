@@ -1,0 +1,29 @@
+# Linea only produces blocks that carry transactions. Empty blocks keep the chain's clock moving for the tests.
+allow-empty-blocks = true
+
+[persistence]
+data-path = "/tmp/maru-db"
+private-key-path = "/tmp/maru-db/private-key"
+
+[qbft]
+fee-recipient = "0x0000000000000000000000000000000000000000"
+
+[payload-validator]
+engine-api-endpoint = { endpoint = "http://besu:8550" }
+payload-validation-enabled = true
+
+[fork-transition]
+l2-eth-api-endpoint = { endpoint = "http://besu:8545" }
+
+[observability]
+port = 9090
+jvm-metrics-enabled = false
+prometheus-metrics-enabled = false
+
+[api]
+port = 8080
+
+[syncing]
+peer-chain-height-polling-interval = "1 seconds"
+el-sync-status-refresh-interval = "1 seconds"
+sync-target-selection = "Highest"

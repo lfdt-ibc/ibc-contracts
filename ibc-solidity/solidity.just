@@ -129,6 +129,13 @@ generate-fixtures-besu: clean-foundry _install-proof-api
 	cd ../e2e/interchaintestv8 && GENERATE_BESU_LIGHT_CLIENT_FIXTURES=true go test -v -run '^TestWithBesuToBesuTestSuite$/^Test_ICS20TransferERC20FromChainAToChainB_(QBFT|IBFT2)$' -timeout 120m
 	@echo "Fixtures generated at 'ibc-solidity/test/besu-bft/fixtures'"
 
+# Generate the Linea light-client fixture using the focused e2e test
+[group('generate')]
+generate-fixtures-linea: clean-foundry _install-proof-api
+	@echo "Generating Linea light client fixture... This may take a while."
+	cd ../e2e/interchaintestv8 && GENERATE_LINEA_LIGHT_CLIENT_FIXTURES=true go test -v -run '^TestWithBesuToBesuTestSuite$/^Test_ICS20TransferERC20FromChainAToChainB_Linea$' -timeout 120m
+	@echo "Fixture generated at 'ibc-solidity/test/linea/fixtures'"
+
 # Generate Go types for the e2e tests from the Ethereum light-client schema
 [group('generate')]
 generate-ethereum-types:

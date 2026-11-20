@@ -1,0 +1,17 @@
+genesis-file="/opt/besu/genesis.json"
+data-path="/opt/besu/data"
+data-storage-format="BONSAI"
+bonsai-limit-trie-logs-enabled=false
+sync-mode="FULL"
+host-allowlist=["*"]
+min-gas-price=0
+tx-pool="legacy"
+discovery-enabled=false
+rpc-http-enabled=true
+rpc-http-host="0.0.0.0"
+rpc-http-api=["ETH","NET","WEB3","DEBUG"]
+rpc-http-cors-origins=["all"]
+# Maru drives block production through the engine API.
+engine-rpc-port=8550
+engine-host-allowlist=["*"]
+engine-jwt-disabled=true

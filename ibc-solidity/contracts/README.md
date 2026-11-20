@@ -30,10 +30,11 @@ All contracts are compiled for the **Cancun** EVM (`evm_version = "cancun"` in `
 All light clients except `ICS02PrecompileWrapper` inherit `light-clients/utils/ICS26ManagedLightClient.sol`: they are bound at construction to an immutable `ICS26_ROUTER`, the only caller allowed to update them, verify proofs or submit misbehaviour. Relayers reach them through the router's `updateClient`, `verifyMembership`, `verifyNonMembership` (`RELAYER_ROLE`) and the permissionless `submitMisbehaviour`. Each client is pausable through `pause()`/`unpause()`, which check `PAUSER_ROLE`/`UNPAUSER_ROLE` in the router's `AccessManager`; a paused client rejects updates and proofs but can still be frozen by misbehaviour.
 - `attestation/AttestationLightClient.sol` – m-of-n attestor-set light client using ECDSA signatures.
 - `besu/BesuLightClient.sol` – Besu IBFT 2.0 and QBFT light client for header-validator mode. Uses weak-subjectivity / trusting-period updates, verifies Besu commit seals over the header in its commit-seal signing form plus EVM account/storage proofs, and proves Eureka commitments against the tracked counterparty `ICS26Router` storage.
+- `linea/LineaLightClient.sol` – proof-of-concept light client for Linea, whose Maru consensus client runs QBFT over beacon blocks. Modelled on the Besu light client: it verifies commit seals over the beacon block header, links the execution state root through the header body root, and checks the validator set against the header beacon state root. See its [README](light-clients/linea/README.md).
 - `ics02-wrapper/ICS02PrecompileWrapper.sol` – Thin adapter that exposes the `ILightClient` interface over the Cosmos EVM ICS02 precompile at a fixed address.
 - `sp1-ics07/SP1ICS07Tendermint.sol` – Tendermint light client verified via SP1 programs and verifier contract; supports update, (non)membership proofs, and misbehaviour handling.
 - `utils/ICS26ManagedLightClient.sol` – Shared base that binds a light client to its `ICS26Router` and authorizes `pause()`/`unpause()` through the router's `AccessManager`.
-- `utils/TrieProof.sol` – Merkle-Patricia trie proof verification forked from OpenZeppelin, used by the Besu light clients for account and storage proofs.
+- `utils/TrieProof.sol` – Merkle-Patricia trie proof verification forked from OpenZeppelin, used by the Besu and Linea light clients for account and storage proofs.
 
 ### Besu light-client scope
 - Supported: Besu **IBFT 2.0** and **QBFT** in **header-validator mode**.

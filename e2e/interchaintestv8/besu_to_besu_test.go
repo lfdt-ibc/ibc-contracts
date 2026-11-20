@@ -36,6 +36,7 @@ import (
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ibcerc20"
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ics20transfer"
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ics26router"
+	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/lineamsgs"
 
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/chainconfig"
 	"github.com/lfdt-ibc/ibc-contracts/e2e/v8/e2esuite"
@@ -58,8 +59,19 @@ const (
 
 var besuToBesuChainBIPs = [5]string{"10.43.0.2", "10.43.0.3", "10.43.0.4", "10.43.0.5", "10.43.0.6"}
 
+// besuToBesuNetwork is what the suite needs from the network that runs a chain.
+type besuToBesuNetwork interface {
+	WaitForTransactionHandling(ctx context.Context) error
+	DumpLogs(ctx context.Context) error
+	Destroy(ctx context.Context)
+}
+
 type besuToBesuChainState struct {
-	network           chainconfig.BesuChain
+	network besuToBesuNetwork
+	// consensus is the testvalues consensus the chain runs, which selects its relayer module and light client.
+	consensus string
+	// beaconAPI is the beacon API of the chain's Maru consensus client, set on Linea chains only.
+	beaconAPI         string
 	eth               ethereum.Ethereum
 	contractAddresses ethereum.DeployedContracts
 	ics26             *ics26router.Contract
@@ -74,12 +86,12 @@ type besuToBesuChainState struct {
 type BesuToBesuTestSuite struct {
 	suite.Suite
 
-	consensus            string
-	cwd                  string
-	relayerConfigPath    string
-	relayerProcess       *os.Process
-	relayerClient        proofapitypes.ProofApiServiceClient
-	besuFixtureGenerator *e2etypes.BesuFixtureGenerator
+	cwd                   string
+	relayerConfigPath     string
+	relayerProcess        *os.Process
+	relayerClient         proofapitypes.ProofApiServiceClient
+	besuFixtureGenerator  *e2etypes.BesuFixtureGenerator
+	lineaFixtureGenerator *e2etypes.LineaFixtureGenerator
 
 	chainA besuToBesuChainState
 	chainB besuToBesuChainState
@@ -89,18 +101,21 @@ func TestWithBesuToBesuTestSuite(t *testing.T) {
 	suite.Run(t, new(BesuToBesuTestSuite))
 }
 
-// SetupSuite starts two Besu networks running consensus, deploys Eureka on both, and connects them through the relayer.
-// Every test calls it, so each test runs against its own networks.
+// SetupSuite starts two networks, deploys Eureka on both, and connects them through the relayer. Chain A runs
+// consensus. Chain B runs it too, unless Chain A is a Linea network: then Chain B is a Besu QBFT network, which makes
+// every test a Linea to Besu test. Every test calls it, so each test runs against its own networks.
 func (s *BesuToBesuTestSuite) SetupSuite(ctx context.Context, consensus string) {
-	s.consensus = consensus
 	// The cleanup runs after testify restores the parent T, so it checks this test's T.
 	t := s.T()
 	t.Cleanup(func() {
 		ctx := context.Background()
 
 		if t.Failed() {
-			_ = s.chainA.network.DumpLogs(ctx)
-			_ = s.chainB.network.DumpLogs(ctx)
+			for _, chain := range []besuToBesuChainState{s.chainA, s.chainB} {
+				if chain.network != nil {
+					_ = chain.network.DumpLogs(ctx)
+				}
+			}
 		}
 
 		if s.relayerProcess != nil {
@@ -110,8 +125,11 @@ func (s *BesuToBesuTestSuite) SetupSuite(ctx context.Context, consensus string) 
 			_ = os.Remove(s.relayerConfigPath)
 		}
 
-		s.chainB.network.Destroy(ctx)
-		s.chainA.network.Destroy(ctx)
+		for _, chain := range []besuToBesuChainState{s.chainB, s.chainA} {
+			if chain.network != nil {
+				chain.network.Destroy(ctx)
+			}
+		}
 
 		if s.cwd != "" {
 			_ = os.Chdir(s.cwd)
@@ -130,10 +148,16 @@ func (s *BesuToBesuTestSuite) SetupSuite(ctx context.Context, consensus string) 
 	s.Require().NoError(err)
 	s.Require().NoError(os.Chdir("../.."))
 
-	s.chainA = s.spinUpChain(ctx, chainconfig.DefaultBesuParams(consensus))
+	chainBConsensus := consensus
+	if consensus == testvalues.LineaConsensusMaru {
+		s.chainA = s.spinUpLineaChain(ctx)
+		chainBConsensus = testvalues.BesuConsensusQBFT
+	} else {
+		s.chainA = s.spinUpChain(ctx, chainconfig.DefaultBesuParams(consensus))
+	}
 
 	s.chainB = s.spinUpChain(ctx, chainconfig.BesuParams{
-		Consensus:    consensus,
+		Consensus:    chainBConsensus,
 		ChainID:      besuToBesuChainBID,
 		Subnet:       "10.43.0.0/16",
 		Gateway:      "10.43.0.1",
@@ -142,6 +166,7 @@ func (s *BesuToBesuTestSuite) SetupSuite(ctx context.Context, consensus string) 
 	s.Require().NoError(s.chainA.network.WaitForTransactionHandling(ctx))
 
 	s.besuFixtureGenerator = e2etypes.NewBesuFixtureGenerator()
+	s.lineaFixtureGenerator = e2etypes.NewLineaFixtureGenerator()
 
 	s.createUsers(&s.chainA)
 	s.createUsers(&s.chainB)
@@ -162,6 +187,10 @@ func (s *BesuToBesuTestSuite) Test_Deploy_QBFT() {
 
 func (s *BesuToBesuTestSuite) Test_Deploy_IBFT2() {
 	s.DeployTest(testvalues.BesuConsensusIBFT2)
+}
+
+func (s *BesuToBesuTestSuite) Test_Deploy_Linea() {
+	s.DeployTest(testvalues.LineaConsensusMaru)
 }
 
 func (s *BesuToBesuTestSuite) DeployTest(consensus string) {
@@ -226,6 +255,14 @@ func (s *BesuToBesuTestSuite) Test_5_ICS20TransferERC20FromChainAToChainB_QBFT()
 
 func (s *BesuToBesuTestSuite) Test_5_ICS20TransferERC20FromChainAToChainB_IBFT2() {
 	s.ICS20TransferERC20FromChainAToChainBTest(testvalues.BesuConsensusIBFT2, 5)
+}
+
+func (s *BesuToBesuTestSuite) Test_ICS20TransferERC20FromChainAToChainB_Linea() {
+	s.ICS20TransferERC20FromChainAToChainBTest(testvalues.LineaConsensusMaru, 1)
+}
+
+func (s *BesuToBesuTestSuite) Test_5_ICS20TransferERC20FromChainAToChainB_Linea() {
+	s.ICS20TransferERC20FromChainAToChainBTest(testvalues.LineaConsensusMaru, 5)
 }
 
 // ICS20TransferERC20FromChainAToChainBTest sends numOfTransfers transfers from Chain A in one tx, then relays the
@@ -388,13 +425,31 @@ func (s *BesuToBesuTestSuite) ICS20TransferERC20FromChainAToChainBTest(consensus
 		}))
 	}))
 
-	if s.besuFixtureGenerator.Enabled {
-		s.Require().True(s.Run(fmt.Sprintf("Generate %s fixture", s.consensus), func() {
+	if s.chainA.consensus == testvalues.LineaConsensusMaru {
+		if s.lineaFixtureGenerator.Enabled {
+			s.Require().True(s.Run("Generate Linea fixture", func() {
+				sendHeight := sendReceipt.BlockNumber.Uint64()
+				s.Require().Greater(sendHeight, uint64(2))
+				s.Require().NoError(s.lineaFixtureGenerator.GenerateAndSaveFixture(ctx, e2etypes.GenerateLineaFixtureParams{
+					SourceChain:             &s.chainA.eth,
+					BeaconAPI:               s.chainA.beaconAPI,
+					RouterAddress:           ics26AddressA,
+					Packet:                  sendPackets[0],
+					InitialTrustedHeight:    sendHeight - 2,
+					AdjacentUpdateHeight:    sendHeight - 1,
+					NonAdjacentUpdateHeight: sendHeight,
+					TrustingPeriod:          uint64(testvalues.DefaultTrustPeriod),
+					MaxClockDrift:           uint64(testvalues.DefaultBesuMaxClockDrift),
+				}))
+			}))
+		}
+	} else if s.besuFixtureGenerator.Enabled {
+		s.Require().True(s.Run(fmt.Sprintf("Generate %s fixture", s.chainA.consensus), func() {
 			sendHeight := sendReceipt.BlockNumber.Uint64()
 			s.Require().Greater(sendHeight, uint64(2))
 			s.Require().Greater(ackReceipt.BlockNumber.Uint64(), sendHeight)
 			s.Require().NoError(s.besuFixtureGenerator.GenerateAndSaveFixture(ctx, e2etypes.GenerateBesuFixtureParams{
-				Consensus:               s.consensus,
+				Consensus:               s.chainA.consensus,
 				SourceChain:             &s.chainA.eth,
 				RouterAddress:           ics26AddressA,
 				Packet:                  sendPackets[0],
@@ -423,6 +478,10 @@ func (s *BesuToBesuTestSuite) Test_5_TimeoutICS20TransferERC20FromChainAToChainB
 
 func (s *BesuToBesuTestSuite) Test_5_TimeoutICS20TransferERC20FromChainAToChainB_IBFT2() {
 	s.TimeoutICS20TransferERC20FromChainAToChainBTest(testvalues.BesuConsensusIBFT2, 5)
+}
+
+func (s *BesuToBesuTestSuite) Test_TimeoutICS20TransferERC20FromChainAToChainB_Linea() {
+	s.TimeoutICS20TransferERC20FromChainAToChainBTest(testvalues.LineaConsensusMaru, 1)
 }
 
 // TimeoutICS20TransferERC20FromChainAToChainBTest sends a transfer with a short timeout from Chain A, followed by
@@ -613,6 +672,10 @@ func (s *BesuToBesuTestSuite) Test_ErrorAckICS20TransferERC20FromChainAToChainB_
 	s.ErrorAckICS20TransferERC20FromChainAToChainBTest(testvalues.BesuConsensusIBFT2)
 }
 
+func (s *BesuToBesuTestSuite) Test_ErrorAckICS20TransferERC20FromChainAToChainB_Linea() {
+	s.ErrorAckICS20TransferERC20FromChainAToChainBTest(testvalues.LineaConsensusMaru)
+}
+
 // ErrorAckICS20TransferERC20FromChainAToChainBTest sends a transfer to a receiver that is not a hex address, so
 // ICS20 on Chain B fails to receive it and ICS26 writes the universal error acknowledgement. Relaying that
 // acknowledgement back to Chain A refunds the sender.
@@ -779,6 +842,10 @@ func (s *BesuToBesuTestSuite) Test_DoubleSignFreezesClient_IBFT2() {
 	s.DoubleSignFreezesClientTest(testvalues.BesuConsensusIBFT2)
 }
 
+func (s *BesuToBesuTestSuite) Test_DoubleSignFreezesClient_Linea() {
+	s.DoubleSignFreezesClientTest(testvalues.LineaConsensusMaru)
+}
+
 // DoubleSignFreezesClientTest freezes a dedicated client on Chain B so the shared clients stay usable.
 func (s *BesuToBesuTestSuite) DoubleSignFreezesClientTest(consensus string) {
 	ctx := context.Background()
@@ -801,7 +868,7 @@ func (s *BesuToBesuTestSuite) DoubleSignFreezesClientTest(consensus string) {
 
 	s.Require().True(s.Run("Update the client to the next height", func() {
 		s.waitForBlock(ctx, &s.chainA, height)
-		honestUpdate, err := e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height)
+		honestUpdate, err := s.buildUpdate(ctx, trustedHeight, height)
 		s.Require().NoError(err)
 		s.requireUpdateResult(s.updateClient(ctx, doubleSignClientID, honestUpdate), 0) // Update
 
@@ -811,7 +878,7 @@ func (s *BesuToBesuTestSuite) DoubleSignFreezesClientTest(consensus string) {
 
 	s.Require().True(s.Run("Build conflicting header at the stored height", func() {
 		var err error
-		updateMsg, err = e2etypes.BuildBesuDoubleSignUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height)
+		updateMsg, err = s.buildDoubleSignUpdate(ctx, trustedHeight, height)
 		s.Require().NoError(err)
 	}))
 
@@ -844,6 +911,10 @@ func (s *BesuToBesuTestSuite) Test_ConflictingConsensusStatesTimeNonMonotonicity
 	s.ConflictingConsensusStatesTimeNonMonotonicityFreezesClientTest(testvalues.BesuConsensusIBFT2)
 }
 
+func (s *BesuToBesuTestSuite) Test_ConflictingConsensusStatesTimeNonMonotonicityFreezesClient_Linea() {
+	s.ConflictingConsensusStatesTimeNonMonotonicityFreezesClientTest(testvalues.LineaConsensusMaru)
+}
+
 // ConflictingConsensusStatesTimeNonMonotonicityFreezesClientTest stores two consensus states whose timestamps do not
 // increase with height on a dedicated client on Chain B, then submits them as misbehaviour. Each update is only
 // checked against its own trusted height, so both updates are accepted.
@@ -870,20 +941,20 @@ func (s *BesuToBesuTestSuite) ConflictingConsensusStatesTimeNonMonotonicityFreez
 	s.Require().True(s.Run("Store consensus states with non-monotonic timestamps", func() {
 		s.waitForBlock(ctx, &s.chainA, height2)
 
-		state2, err := e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.consensus, height2)
+		state2, err := s.fetchConsensusState(ctx, height2)
 		s.Require().NoError(err)
 		timestamp = state2.Timestamp
 
-		honestUpdate, err := e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height2)
+		honestUpdate, err := s.buildUpdate(ctx, trustedHeight, height2)
 		s.Require().NoError(err)
 		s.requireUpdateResult(s.updateClient(ctx, timeMisbehaviourClientID, honestUpdate), 0) // Update
 
 		// Height1 is re-sealed with the timestamp of height2.
-		forgedUpdate, err := e2etypes.BuildBesuTimestampUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height1, timestamp)
+		forgedUpdate, err := s.buildTimestampUpdate(ctx, trustedHeight, height1, timestamp)
 		s.Require().NoError(err)
 		s.requireUpdateResult(s.updateClient(ctx, timeMisbehaviourClientID, forgedUpdate), 0) // Update
 
-		state1, err := e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.consensus, height1)
+		state1, err := s.fetchConsensusState(ctx, height1)
 		s.Require().NoError(err)
 		state1.Timestamp = timestamp
 
@@ -940,6 +1011,10 @@ func (s *BesuToBesuTestSuite) Test_ConflictingHeadersDoubleSignMisbehaviourIsPer
 	s.ConflictingHeadersDoubleSignMisbehaviourIsPermissionlessTest(testvalues.BesuConsensusIBFT2)
 }
 
+func (s *BesuToBesuTestSuite) Test_ConflictingHeadersDoubleSignMisbehaviourIsPermissionless_Linea() {
+	s.ConflictingHeadersDoubleSignMisbehaviourIsPermissionlessTest(testvalues.LineaConsensusMaru)
+}
+
 // ConflictingHeadersDoubleSignMisbehaviourIsPermissionlessTest submits two conflicting headers at the same height to
 // a dedicated client on Chain B through the router's permissionless submitMisbehaviour, from an account without any
 // role. Neither header is stored.
@@ -962,9 +1037,9 @@ func (s *BesuToBesuTestSuite) ConflictingHeadersDoubleSignMisbehaviourIsPermissi
 		s.waitForBlock(ctx, &s.chainA, height)
 
 		var err error
-		honestUpdate, err = e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height)
+		honestUpdate, err = s.buildUpdate(ctx, trustedHeight, height)
 		s.Require().NoError(err)
-		conflictingUpdate, err := e2etypes.BuildBesuDoubleSignUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height)
+		conflictingUpdate, err := s.buildDoubleSignUpdate(ctx, trustedHeight, height)
 		s.Require().NoError(err)
 		misbehaviourMsg = s.conflictingHeadersMisbehaviourMsg(honestUpdate, conflictingUpdate)
 	}))
@@ -1007,6 +1082,10 @@ func (s *BesuToBesuTestSuite) Test_ConflictingHeadersTimeNonMonotonicityMisbehav
 	s.ConflictingHeadersTimeNonMonotonicityMisbehaviourIsPermissionlessTest(testvalues.BesuConsensusIBFT2)
 }
 
+func (s *BesuToBesuTestSuite) Test_ConflictingHeadersTimeNonMonotonicityMisbehaviourIsPermissionless_Linea() {
+	s.ConflictingHeadersTimeNonMonotonicityMisbehaviourIsPermissionlessTest(testvalues.LineaConsensusMaru)
+}
+
 // ConflictingHeadersTimeNonMonotonicityMisbehaviourIsPermissionlessTest submits two headers whose timestamps do not
 // increase with height to a dedicated client on Chain B through the router's permissionless submitMisbehaviour, from
 // an account without any role. Neither header is stored.
@@ -1028,14 +1107,14 @@ func (s *BesuToBesuTestSuite) ConflictingHeadersTimeNonMonotonicityMisbehaviourI
 		height1, height2 = trustedHeight+1, trustedHeight+2
 		s.waitForBlock(ctx, &s.chainA, height2)
 
-		state2, err := e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.consensus, height2)
+		state2, err := s.fetchConsensusState(ctx, height2)
 		s.Require().NoError(err)
 		timestamp = state2.Timestamp
 
-		honestUpdate, err := e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height2)
+		honestUpdate, err := s.buildUpdate(ctx, trustedHeight, height2)
 		s.Require().NoError(err)
 		// Height1 is re-sealed with the timestamp of height2.
-		forgedUpdate, err := e2etypes.BuildBesuTimestampUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, height1, timestamp)
+		forgedUpdate, err := s.buildTimestampUpdate(ctx, trustedHeight, height1, timestamp)
 		s.Require().NoError(err)
 		misbehaviourMsg = s.conflictingHeadersMisbehaviourMsg(honestUpdate, forgedUpdate)
 	}))
@@ -1089,7 +1168,7 @@ func (s *BesuToBesuTestSuite) ValidatorSetChangesTest(consensus string) {
 		client = s.createDedicatedBesuClient(clientID, besuToBesuDefaultTrustLevel)
 		trustedHeight := s.besuClientState(client).LatestHeight.RevisionHeight
 
-		initialState, err := e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.consensus, trustedHeight)
+		initialState, err := s.fetchConsensusState(ctx, trustedHeight)
 		s.Require().NoError(err)
 		initialValidators = initialState.Validators
 		s.Require().Len(initialValidators, 4)
@@ -1097,10 +1176,10 @@ func (s *BesuToBesuTestSuite) ValidatorSetChangesTest(consensus string) {
 
 	s.Require().True(s.Run("Remove a validator from Chain A", func() {
 		var err error
-		removalHeight, err = s.chainA.network.RemoveValidator(ctx, removedValidator)
+		removalHeight, err = s.chainA.network.(chainconfig.BesuChain).RemoveValidator(ctx, removedValidator)
 		s.Require().NoError(err)
 
-		state, err := e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.consensus, removalHeight)
+		state, err := s.fetchConsensusState(ctx, removalHeight)
 		s.Require().NoError(err)
 		remainingValidators = state.Validators
 		s.Require().Len(remainingValidators, 3)
@@ -1109,7 +1188,7 @@ func (s *BesuToBesuTestSuite) ValidatorSetChangesTest(consensus string) {
 
 	s.Require().True(s.Run("Client follows the removal", func() {
 		trustedHeight := s.besuClientState(client).LatestHeight.RevisionHeight
-		updateMsg, err := e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.consensus, trustedHeight, removalHeight)
+		updateMsg, err := s.buildUpdate(ctx, trustedHeight, removalHeight)
 		s.Require().NoError(err)
 		s.requireUpdateResult(s.updateClient(ctx, clientID, updateMsg), 0) // Update
 		s.Require().Equal(removalHeight, s.besuClientState(client).LatestHeight.RevisionHeight)
@@ -1117,10 +1196,10 @@ func (s *BesuToBesuTestSuite) ValidatorSetChangesTest(consensus string) {
 
 	s.Require().True(s.Run("Add a new validator to Chain A", func() {
 		var err error
-		additionHeight, err = s.chainA.network.AddValidator(ctx, addedValidator)
+		additionHeight, err = s.chainA.network.(chainconfig.BesuChain).AddValidator(ctx, addedValidator)
 		s.Require().NoError(err)
 
-		state, err := e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.consensus, additionHeight)
+		state, err := s.fetchConsensusState(ctx, additionHeight)
 		s.Require().NoError(err)
 		s.Require().Len(state.Validators, 4)
 		s.Require().Subset(state.Validators, remainingValidators)
@@ -1136,7 +1215,7 @@ func (s *BesuToBesuTestSuite) ValidatorSetChangesTest(consensus string) {
 		height := s.waitForChainAHeader(ctx, additionHeight, func(signers []ethcommon.Address) bool {
 			return slices.Contains(signers, newValidator)
 		})
-		updateMsg, err := e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.consensus, removalHeight, height)
+		updateMsg, err := s.buildUpdate(ctx, removalHeight, height)
 		s.Require().NoError(err)
 		s.requireUpdateResult(s.updateClient(ctx, clientID, updateMsg), 0) // Update
 		s.Require().Equal(height, s.besuClientState(client).LatestHeight.RevisionHeight)
@@ -1152,7 +1231,7 @@ func (s *BesuToBesuTestSuite) waitForChainAHeader(ctx context.Context, start uin
 			return false, err
 		}
 		for ; height <= latest; height++ {
-			signers, err := e2etypes.FetchBesuCommitSealSigners(ctx, &s.chainA.eth, s.consensus, height)
+			signers, err := e2etypes.FetchBesuCommitSealSigners(ctx, &s.chainA.eth, s.chainA.consensus, height)
 			if err != nil {
 				return false, err
 			}
@@ -1165,7 +1244,9 @@ func (s *BesuToBesuTestSuite) waitForChainAHeader(ctx context.Context, start uin
 	return height
 }
 
-// createDedicatedBesuClient registers a Chain A client on Chain B that the relayer does not use.
+// createDedicatedBesuClient registers a Chain A client on Chain B that the relayer does not use. When Chain A is a
+// Linea network this is a Linea light client: it shares the Besu light client's views, events, errors and state
+// encodings, so the suite reads both through the Besu bindings. Only their update messages differ.
 func (s *BesuToBesuTestSuite) createDedicatedBesuClient(clientID, trustLevel string) *besulightclient.Contract {
 	clientAddress := s.createAndRegisterBesuClient(&s.chainA, &s.chainB, clientID, besuToBesuClientOnA, trustLevel)
 	client, err := besulightclient.NewContract(clientAddress, s.chainB.eth.RPCClient)
@@ -1287,22 +1368,69 @@ func (s *BesuToBesuTestSuite) besuClientCalldata(method string, args ...any) []b
 	return calldata
 }
 
-// conflictingHeadersMisbehaviourMsg wraps two abi-encoded MsgUpdateClient payloads into
+// conflictingHeadersMisbehaviourMsg wraps two abi-encoded MsgUpdateClient payloads of Chain A headers into
 // abi.encode(MsgSubmitMisbehaviour) of type ConflictingHeaders, without function selectors.
 func (s *BesuToBesuTestSuite) conflictingHeadersMisbehaviourMsg(update1, update2 []byte) []byte {
-	bindings := besumsgs.NewBindings()
-	msg1, err := bindings.UnpackUpdateClient(update1)
-	s.Require().NoError(err)
-	msg2, err := bindings.UnpackUpdateClient(update2)
-	s.Require().NoError(err)
-
-	return bindings.PackSubmitMisbehaviour(besumsgs.IBesuLightClientMsgsMsgSubmitMisbehaviour{
-		MisbehaviourType: 1, // ConflictingHeaders
-		Misbehaviour: bindings.PackConflictingHeadersMisbehaviour(besumsgs.IBesuLightClientMsgsMsgConflictingHeadersMisbehaviour{
+	var misbehaviour []byte
+	if s.chainA.consensus == testvalues.LineaConsensusMaru {
+		bindings := lineamsgs.NewBindings()
+		msg1, err := bindings.UnpackUpdateClient(update1)
+		s.Require().NoError(err)
+		msg2, err := bindings.UnpackUpdateClient(update2)
+		s.Require().NoError(err)
+		misbehaviour = bindings.PackConflictingHeadersMisbehaviour(lineamsgs.ILineaLightClientMsgsMsgConflictingHeadersMisbehaviour{
 			Update1: msg1,
 			Update2: msg2,
-		})[4:],
+		})[4:]
+	} else {
+		bindings := besumsgs.NewBindings()
+		msg1, err := bindings.UnpackUpdateClient(update1)
+		s.Require().NoError(err)
+		msg2, err := bindings.UnpackUpdateClient(update2)
+		s.Require().NoError(err)
+		misbehaviour = bindings.PackConflictingHeadersMisbehaviour(besumsgs.IBesuLightClientMsgsMsgConflictingHeadersMisbehaviour{
+			Update1: msg1,
+			Update2: msg2,
+		})[4:]
+	}
+
+	return besumsgs.NewBindings().PackSubmitMisbehaviour(besumsgs.IBesuLightClientMsgsMsgSubmitMisbehaviour{
+		MisbehaviourType: 1, // ConflictingHeaders
+		Misbehaviour:     misbehaviour,
 	})[4:]
+}
+
+// buildUpdate returns the abi-encoded MsgUpdateClient for the live Chain A header at height, without a selector.
+func (s *BesuToBesuTestSuite) buildUpdate(ctx context.Context, trustedHeight, height uint64) ([]byte, error) {
+	if s.chainA.consensus == testvalues.LineaConsensusMaru {
+		return e2etypes.BuildLineaUpdate(ctx, s.chainA.beaconAPI, trustedHeight, height)
+	}
+	return e2etypes.BuildBesuUpdate(ctx, &s.chainA.eth, s.chainA.consensus, trustedHeight, height)
+}
+
+// buildDoubleSignUpdate returns the update for the Chain A header at height re-sealed over a different state root.
+func (s *BesuToBesuTestSuite) buildDoubleSignUpdate(ctx context.Context, trustedHeight, height uint64) ([]byte, error) {
+	if s.chainA.consensus == testvalues.LineaConsensusMaru {
+		return e2etypes.BuildLineaDoubleSignUpdate(ctx, s.chainA.beaconAPI, trustedHeight, height)
+	}
+	return e2etypes.BuildBesuDoubleSignUpdate(ctx, &s.chainA.eth, s.chainA.consensus, trustedHeight, height)
+}
+
+// buildTimestampUpdate returns the update for the Chain A header at height re-sealed with timestamp.
+func (s *BesuToBesuTestSuite) buildTimestampUpdate(ctx context.Context, trustedHeight, height, timestamp uint64) ([]byte, error) {
+	if s.chainA.consensus == testvalues.LineaConsensusMaru {
+		return e2etypes.BuildLineaTimestampUpdate(ctx, s.chainA.beaconAPI, trustedHeight, height, timestamp)
+	}
+	return e2etypes.BuildBesuTimestampUpdate(ctx, &s.chainA.eth, s.chainA.consensus, trustedHeight, height, timestamp)
+}
+
+// fetchConsensusState returns the consensus state a light client derives from the live Chain A header at height.
+func (s *BesuToBesuTestSuite) fetchConsensusState(ctx context.Context, height uint64) (besumsgs.IBesuLightClientMsgsConsensusState, error) {
+	if s.chainA.consensus == testvalues.LineaConsensusMaru {
+		state, err := e2etypes.FetchLineaConsensusState(ctx, s.chainA.beaconAPI, height)
+		return besumsgs.IBesuLightClientMsgsConsensusState(state), err
+	}
+	return e2etypes.FetchBesuConsensusState(ctx, &s.chainA.eth, s.chainA.consensus, height)
 }
 
 // submitBesuMisbehaviour submits misbehaviour through Chain B's router from Chain B's user, which holds no role.
@@ -1331,8 +1459,24 @@ func (s *BesuToBesuTestSuite) spinUpChain(ctx context.Context, params chainconfi
 	s.Require().NoError(err)
 
 	return besuToBesuChainState{
-		network: network,
-		eth:     ethChain,
+		network:   network,
+		consensus: params.Consensus,
+		eth:       ethChain,
+	}
+}
+
+func (s *BesuToBesuTestSuite) spinUpLineaChain(ctx context.Context) besuToBesuChainState {
+	network, err := chainconfig.SpinUpLinea(ctx)
+	s.Require().NoError(err)
+
+	ethChain, err := ethereum.NewEthereum(ctx, network.RPC, nil, network.Faucet)
+	s.Require().NoError(err)
+
+	return besuToBesuChainState{
+		network:   network,
+		consensus: testvalues.LineaConsensusMaru,
+		beaconAPI: network.BeaconAPI,
+		eth:       ethChain,
 	}
 }
 
@@ -1364,28 +1508,34 @@ func (s *BesuToBesuTestSuite) deployContracts(chain *besuToBesuChainState) {
 }
 
 func (s *BesuToBesuTestSuite) startRelayer() {
-	config := proofapi.NewConfigBuilder().
-		BesuToEth(proofapi.BesuToEthParams{
-			SrcChainID:      s.chainA.eth.ChainID.String(),
-			DstChainID:      s.chainB.eth.ChainID.String(),
-			SrcRPC:          s.chainA.eth.RPC,
-			DstRPC:          s.chainB.eth.RPC,
-			SrcICS26:        s.chainA.contractAddresses.Ics26Router,
-			DstICS26:        s.chainB.contractAddresses.Ics26Router,
-			DstIBCMulticall: s.chainB.contractAddresses.IbcMulticall,
-			ConsensusType:   s.consensus,
-		}).
-		BesuToEth(proofapi.BesuToEthParams{
-			SrcChainID:      s.chainB.eth.ChainID.String(),
-			DstChainID:      s.chainA.eth.ChainID.String(),
-			SrcRPC:          s.chainB.eth.RPC,
-			DstRPC:          s.chainA.eth.RPC,
-			SrcICS26:        s.chainB.contractAddresses.Ics26Router,
-			DstICS26:        s.chainA.contractAddresses.Ics26Router,
-			DstIBCMulticall: s.chainA.contractAddresses.IbcMulticall,
-			ConsensusType:   s.consensus,
-		}).
-		Build()
+	builder := proofapi.NewConfigBuilder()
+	for _, direction := range [][2]*besuToBesuChainState{{&s.chainA, &s.chainB}, {&s.chainB, &s.chainA}} {
+		src, dst := direction[0], direction[1]
+		if src.consensus == testvalues.LineaConsensusMaru {
+			builder.LineaToEth(proofapi.LineaToEthParams{
+				SrcChainID:      src.eth.ChainID.String(),
+				DstChainID:      dst.eth.ChainID.String(),
+				SrcRPC:          src.eth.RPC,
+				SrcBeaconAPI:    src.beaconAPI,
+				DstRPC:          dst.eth.RPC,
+				SrcICS26:        src.contractAddresses.Ics26Router,
+				DstICS26:        dst.contractAddresses.Ics26Router,
+				DstIBCMulticall: dst.contractAddresses.IbcMulticall,
+			})
+			continue
+		}
+		builder.BesuToEth(proofapi.BesuToEthParams{
+			SrcChainID:      src.eth.ChainID.String(),
+			DstChainID:      dst.eth.ChainID.String(),
+			SrcRPC:          src.eth.RPC,
+			DstRPC:          dst.eth.RPC,
+			SrcICS26:        src.contractAddresses.Ics26Router,
+			DstICS26:        dst.contractAddresses.Ics26Router,
+			DstIBCMulticall: dst.contractAddresses.IbcMulticall,
+			ConsensusType:   src.consensus,
+		})
+	}
+	config := builder.Build()
 
 	s.relayerConfigPath = filepath.Join(os.TempDir(), fmt.Sprintf("besu-to-besu-relayer-%d.json", time.Now().UnixNano()))
 	s.Require().NoError(config.GenerateConfigFile(s.relayerConfigPath))

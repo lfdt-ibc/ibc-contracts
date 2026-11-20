@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# A single-validator Linea network: Maru, Linea's QBFT consensus client, drives a Besu execution client through the
+# engine API.
+services:
+  besu:
+    image: hyperledger/besu:26.4.0
+    environment:
+      BESU_OPTS: -Xms128m -Xmx512m -XX:ActiveProcessorCount=2
+    command:
+      - --config-file=/opt/besu/config.toml
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/8550"]
+      interval: 1s
+      retries: 120
+    volumes:
+      - ./besu.toml:/opt/besu/config.toml:ro
+      - ./genesis-besu.json:/opt/besu/genesis.json:ro
+      - besu-data:/opt/besu/data
+    ports:
+      - "8545"
+
+  maru:
+    image: consensys/maru:1.6.0-20261119-51ebdc0
+    environment:
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:ActiveProcessorCount=2
+    command:
+      - java
+      - -jar
+      - /opt/consensys/maru/maru.jar
+      - --genesis-file=/opt/maru/genesis.json
+      - --config=/opt/maru/config.toml
+    depends_on:
+      besu:
+        condition: service_healthy
+    volumes:
+      - ./maru.toml:/opt/maru/config.toml:ro
+      - ./genesis-maru.json:/opt/maru/genesis.json:ro
+      - ./maru-key:/tmp/maru-db/private-key:ro
+    ports:
+      - "8080"
+
+volumes:
+  besu-data:

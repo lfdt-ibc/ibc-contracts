@@ -104,3 +104,21 @@ The fixture command runs the focused Besu↔Besu transfer tests with
 
 - `ibc-solidity/test/besu-bft/fixtures/qbft.json`
 - `ibc-solidity/test/besu-bft/fixtures/ibft2.json`
+
+## Focused Linea → Besu e2e
+
+The tests of the Besu ↔ Besu suite that end in `_Linea` run with a Linea network as Chain A and a Besu QBFT network as
+Chain B. The Linea network is a single-validator [Maru](https://github.com/Consensys/linea-monorepo/tree/main/maru)
+consensus client driving a Besu execution client, from `chainconfig/testdata/linea`. The relayer runs `linea_to_eth`
+from Chain A to Chain B and `besu_to_eth` back, so Chain B tracks Chain A with a `LineaLightClient` and Chain A tracks
+Chain B with a `BesuLightClient`.
+
+```bash
+just test-e2e TestWithBesuToBesuTestSuite/Test_Deploy_Linea
+just test-e2e TestWithBesuToBesuTestSuite/Test_ICS20TransferERC20FromChainAToChainB_Linea
+just test-e2e TestWithBesuToBesuTestSuite/Test_TimeoutICS20TransferERC20FromChainAToChainB_Linea
+just test-e2e TestWithBesuToBesuTestSuite/Test_DoubleSignFreezesClient_Linea
+
+# Regenerate the Linea light-client fixture used by test/linea/*
+just solidity::generate-fixtures-linea
+```

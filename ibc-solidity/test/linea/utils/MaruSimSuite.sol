@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.28;
 
-// solhint-disable gas-custom-errors,gas-calldata-parameters
+// solhint-disable gas-custom-errors,gas-calldata-parameters,gas-struct-packing
 
 import { Test } from "forge-std/Test.sol";
 import { ERC1967Utils } from "@openzeppelin-contracts/proxy/ERC1967/ERC1967Utils.sol";
