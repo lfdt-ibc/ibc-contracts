@@ -166,10 +166,11 @@ func (s *CantonGMPTestSuite) SetupSuite(ctx context.Context) {
 		s.Require().NoError(err)
 		s.ledger = sandbox.Client
 
-		for hint, party := range map[string]*string{
-			"operator": &s.operator, "gmp": &s.gmp, "relayer": &s.relayer, "alice": &s.alice,
-		} {
-			*party, err = s.ledger.AllocateParty(ctx, hint)
+		for _, party := range []struct {
+			hint string
+			id   *string
+		}{{"operator", &s.operator}, {"gmp-app", &s.gmp}, {"relayer", &s.relayer}, {"alice", &s.alice}} {
+			*party.id, err = s.ledger.AllocateParty(ctx, party.hint)
 			s.Require().NoError(err)
 		}
 

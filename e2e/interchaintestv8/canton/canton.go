@@ -27,6 +27,8 @@ const (
 	sandboxStartTimeout = 5 * time.Minute
 	// userID is the Ledger API user commands are submitted as. The sandbox runs without auth.
 	userID = "e2e"
+	// templateIDKey is the JSON field naming a template in commands and filters.
+	templateIDKey = "templateId"
 )
 
 // Sandbox is a running Canton sandbox with one participant and one synchronizer.
@@ -142,7 +144,7 @@ type Transaction struct {
 // Create builds a command that creates a contract.
 func Create(templateID string, arguments any) any {
 	return map[string]any{"CreateCommand": map[string]any{
-		"templateId":      templateID,
+		templateIDKey:     templateID,
 		"createArguments": arguments,
 	}}
 }
@@ -150,7 +152,7 @@ func Create(templateID string, arguments any) any {
 // Exercise builds a command that exercises a choice on a contract.
 func Exercise(templateID, contractID, choice string, argument any) any {
 	return map[string]any{"ExerciseCommand": map[string]any{
-		"templateId":     templateID,
+		templateIDKey:    templateID,
 		"contractId":     contractID,
 		"choice":         choice,
 		"choiceArgument": argument,
@@ -254,7 +256,7 @@ func (c *Client) ActiveContracts(ctx context.Context, party, templateID string) 
 		"eventFormat": map[string]any{
 			"filtersByParty": map[string]any{party: map[string]any{"cumulative": []any{map[string]any{
 				"identifierFilter": map[string]any{"TemplateFilter": map[string]any{"value": map[string]any{
-					"templateId":              templateID,
+					templateIDKey:             templateID,
 					"includeCreatedEventBlob": false,
 				}}},
 			}}}},
