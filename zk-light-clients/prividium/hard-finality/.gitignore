@@ -1,0 +1,12 @@
+/target/
+/contracts/cache/
+/contracts/out/
+/contracts/broadcast/
+/contracts/lib/
+/e2e/solidity/cache/
+/e2e/solidity/out/
+/CODEX_IMPLEMENTATION_PROMPT.md
+.env
+.env.*
+!.env.example
+/scripts/e2e-server/.runtime/

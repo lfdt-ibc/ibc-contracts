@@ -1,0 +1,64 @@
+[package]
+name = "prividium-proof-api"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+build = "build.rs"
+
+[[bin]]
+name = "prividium-proof-api"
+path = "src/main.rs"
+required-features = ["sp1"]
+
+[features]
+default = []
+sp1 = ["dep:sp1-sdk"]
+
+[dependencies]
+alloy-consensus = "=1.8.3"
+alloy-primitives = "=1.7.1"
+alloy-signer = "=1.8.3"
+alloy-signer-local = "=1.8.3"
+blake2 = "=0.10.6"
+hex = "=0.4.3"
+prost = "=0.13.5"
+prividium-consensus = { path = "../../crates/consensus" }
+prividium-profile-constants = { path = "../../crates/profile-constants" }
+prividium-settlement = { path = "../../crates/settlement" }
+prividium-source-profile = { path = "../../crates/source-profile" }
+prividium-ssz = { path = "../../crates/ssz" }
+prividium-types = { path = "../../crates/types" }
+prividium-zksync-native = { path = "../../crates/zksync-native" }
+prividium-zksync-rpc = { path = "../../crates/zksync-rpc" }
+reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+sha2 = "=0.10.9"
+sha3 = "=0.10.8"
+sp1-sdk = { version = "=6.7.0", features = ["blocking", "network"], optional = true }
+tokio = { version = "=1.47.1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
+tonic = { version = "=0.12.3", features = ["transport"] }
+url = "=2.5.8"
+
+[build-dependencies]
+protoc-bin-vendored = "=3.2.0"
+tonic-build = "=0.12.3"
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+# Keep this service and its lockfile independent from both the Prividium guest
+# workspace and the enclosing ibc-contracts workspace.
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+missing_errors_doc = "allow"

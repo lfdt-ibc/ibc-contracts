@@ -1,0 +1,21 @@
+{
+  "case": "existing-zero",
+  "serverTag": "v0.20.8",
+  "serverCommit": "dbb5c03d4a94ceb1acea9f79242590f354660239",
+  "l2Block": 5,
+  "l1Batch": 5,
+  "address": "0xe441cf0795af14ddb9f7984da85cd36db1b8790d",
+  "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "nativeTreeKey": "0xa01e4211894e4d61851e1b9b9afa0e24375e6bed7c2e431ff9d05709d1519d32",
+  "proofType": "existing",
+  "value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "index": 103,
+  "nextIndex": 92,
+  "explicitSiblingCount": 7,
+  "nativeTreeRoot": "0x931b17233867e41047e3f1fb4a3400647ad8eefcb2d495824918a2916c662932",
+  "stateCommitment": "0xb9af383b2a2a9ff142363956da8ed0349ab104dd10dfdc2ad6418c35fc438181",
+  "l1DiamondProxy": "0x18f438bc08d755e164a7ae7c077e2ea93b0179ef",
+  "computedStoredBatchHash": "0xebca5304715691bf4533d3102c891f2923e3a5df1f706482f50263c0f985e9d1",
+  "onchainStoredBatchHash": "0xebca5304715691bf4533d3102c891f2923e3a5df1f706482f50263c0f985e9d1",
+  "writeTransactionHash": "0x2e9eaeffd82540e598814a374cc88e616b7adc2bfddaaa08b4adf68522052fe1"
+}

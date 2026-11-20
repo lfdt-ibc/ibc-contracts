@@ -1,0 +1,14 @@
+{
+  "testDataId": "zksync-os-v0.20.8-local-compressed-proof",
+  "testDataVersion": 1,
+  "sourceType": "local-dev",
+  "sourceReference": "Real never-existing zks_getProof response retained for deterministic compression regression",
+  "sourceProfileId": null,
+  "inputFiles": ["../never-existing/raw-response.json", "normalized.json"],
+  "expectedSuccess": true,
+  "expectedDecodedFields": {"treeDepth": 64, "leftExplicitSiblings": 7, "rightExplicitSiblings": 7, "expandedEmptySiblingsPerNeighbor": 57},
+  "expectedHashes": {"nativeTreeRoot": "0x1efd73ca324557ff31d344658562e41262281781c16020ba90ed12b79c56950b"},
+  "expectedPublicValuesHex": null,
+  "expectedError": null,
+  "mutation": null
+}

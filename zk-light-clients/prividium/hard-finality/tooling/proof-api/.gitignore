@@ -1,0 +1,4 @@
+/target/
+/config.json
+.env
+CODEX_IMPLEMENTATION_PROMPT.md

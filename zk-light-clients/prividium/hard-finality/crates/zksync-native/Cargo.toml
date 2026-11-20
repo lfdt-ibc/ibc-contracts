@@ -1,0 +1,17 @@
+[package]
+name = "prividium-zksync-native"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prividium-crypto = { path = "../crypto" }
+prividium-types = { path = "../types" }
+serde.workspace = true
+
+[build-dependencies]
+blake2.workspace = true
+
+[dev-dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
