@@ -62,6 +62,7 @@
           inherit anchor;
         };
         anchor-go = pkgs.callPackage ./nix/anchor-go.nix {};
+        daml-sdk = pkgs.callPackage ./nix/daml.nix {};
 
         # Always replace `ibc-solidity/node_modules` with the Nix-managed one so that the shell never
         # picks up a stale local install, whether it is a symlink or a real directory.
@@ -134,6 +135,17 @@
                 export PATH="${solana-agave}/bin:$PATH"
                 echo "Solana shell: solana, anchor-nix (build|test|unit-test|keys|deploy)"
               '';
+          };
+
+          # Everything needed to work on the Canton (Daml) part of this project
+          canton = pkgs.mkShell {
+            buildInputs =
+              rust.packages
+              ++ go.packages
+              ++ common.packages
+              ++ [daml-sdk];
+            inherit (rust.env) RUST_SRC_PATH;
+            inherit (rust) shellHook;
           };
         };
       }

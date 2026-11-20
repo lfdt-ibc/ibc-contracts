@@ -1,0 +1,27 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | IBC v2 packet types, mirroring `IICS26RouterMsgs.sol`.
+--
+-- Byte strings are lowercase hex `Text` without a `0x` prefix ('BytesHex').
+module IBC.Types where
+
+import DA.Crypto.Text (BytesHex)
+
+data Payload = Payload
+  with
+    sourcePort : Text
+    destPort : Text
+    version : Text
+    encoding : Text
+    value : BytesHex
+  deriving (Eq, Show)
+
+data Packet = Packet
+  with
+    sequence : Int
+    sourceClient : Text
+    destClient : Text
+    timeoutTimestamp : Int
+      -- ^ Unix seconds.
+    payloads : [Payload]
+  deriving (Eq, Show)

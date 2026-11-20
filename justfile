@@ -8,6 +8,9 @@ mod solidity 'ibc-solidity/solidity.just'
 # Solana IBC implementation recipes (run from the ibc-solana directory)
 mod solana 'ibc-solana/solana.just'
 
+# Canton IBC implementation recipes (run from the ibc-canton directory)
+mod canton 'ibc-canton/canton.just'
+
 
 # Default task lists all available tasks
 default:

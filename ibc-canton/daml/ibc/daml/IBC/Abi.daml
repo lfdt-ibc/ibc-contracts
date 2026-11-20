@@ -1,0 +1,34 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | The subset of Solidity ABI encoding needed for ICS27 packet data: `abi.encode` of a struct
+-- whose fields are all `string` or `bytes`.
+module IBC.Abi where
+
+import DA.Crypto.Text (BytesHex)
+import IBC.Hex
+
+word : Int -> BytesHex
+word = uintBE 32
+
+-- | Length-prefixed bytes, right-padded to a multiple of 32 bytes.
+encodeBytes : BytesHex -> BytesHex
+encodeBytes b = word (len b) <> b <> mconcat (replicate ((32 - len b % 32) % 32) "00")
+
+-- | `abi.encode(S)` for a struct `S` with the given `string`/`bytes` fields.
+encodeDynamicStruct : [BytesHex] -> BytesHex
+encodeDynamicStruct fields =
+  let tails = map encodeBytes fields
+      headSize = 32 * length fields
+      offsets = reverse . snd $ foldl (\(off, acc) t -> (off + len t, off :: acc)) (headSize, []) tails
+  in word 32 <> mconcat (map word offsets) <> mconcat tails
+
+-- | Inverse of 'encodeDynamicStruct' for a struct with `n` fields.
+decodeDynamicStruct : Int -> BytesHex -> [BytesHex]
+decodeDynamicStruct n encoded =
+  let start = toUint (slice encoded 0 32)
+      body = slice encoded start (len encoded - start)
+      field i =
+        let off = toUint (slice body (32 * i) 32)
+            size = toUint (slice body off 32)
+        in slice body (off + 32) size
+  in map field [0 .. n - 1]

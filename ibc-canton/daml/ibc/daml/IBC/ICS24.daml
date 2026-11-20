@@ -1,0 +1,44 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | ICS24 host paths and commitments. Port of `ICS24Host.sol`; outputs must stay byte-identical.
+module IBC.ICS24 where
+
+import DA.Crypto.Text
+import IBC.Hex
+import IBC.Types
+
+-- | Hex of sha256("UNIVERSAL_ERROR_ACKNOWLEDGEMENT").
+universalErrorAck : BytesHex
+universalErrorAck = sha256 (toHex "UNIVERSAL_ERROR_ACKNOWLEDGEMENT")
+
+packetCommitmentPath : Text -> Int -> BytesHex
+packetCommitmentPath clientId sequence = toHex clientId <> "01" <> uintBE 8 sequence
+
+packetReceiptCommitmentPath : Text -> Int -> BytesHex
+packetReceiptCommitmentPath clientId sequence = toHex clientId <> "02" <> uintBE 8 sequence
+
+packetAcknowledgementCommitmentPath : Text -> Int -> BytesHex
+packetAcknowledgementCommitmentPath clientId sequence = toHex clientId <> "03" <> uintBE 8 sequence
+
+-- | sha256(0x02 ‖ sha256(destClient) ‖ sha256(u64BE timeout) ‖ sha256(payload hashes)).
+packetCommitment : Packet -> BytesHex
+packetCommitment packet =
+  sha256 $
+    "02"
+      <> sha256 (toHex packet.destClient)
+      <> sha256 (uintBE 8 packet.timeoutTimestamp)
+      <> sha256 (mconcat (map hashPayload packet.payloads))
+
+hashPayload : Payload -> BytesHex
+hashPayload p =
+  sha256 $
+    sha256 (toHex p.sourcePort)
+      <> sha256 (toHex p.destPort)
+      <> sha256 (toHex p.version)
+      <> sha256 (toHex p.encoding)
+      <> sha256 p.value
+
+-- | sha256(0x02 ‖ sha256(ack_1) ‖ ...).
+packetAcknowledgementCommitment : [BytesHex] -> BytesHex
+packetAcknowledgementCommitment [] = error "no acknowledgements"
+packetAcknowledgementCommitment acks = sha256 ("02" <> mconcat (map sha256 acks))

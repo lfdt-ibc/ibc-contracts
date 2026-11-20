@@ -1,0 +1,38 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Byte-string helpers over 'BytesHex'.
+module IBC.Hex where
+
+import DA.Crypto.Text
+import DA.Optional (fromSomeNote)
+import DA.Text qualified as T
+
+-- | Number of bytes in a hex string. Total, unlike `byteCount` on the empty string.
+len : BytesHex -> Int
+len h = T.length h / 2
+
+-- | Big-endian encoding of a non-negative `Int`, left-padded to `n` bytes.
+uintBE : Int -> Int -> BytesHex
+uintBE n x
+  | x < 0 = error "uintBE: negative"
+  | otherwise = fromSomeNote "uintBE: pad" (packHexBytes (toHex x) n)
+
+-- | `len` bytes starting at 0-indexed byte `off`.
+slice : BytesHex -> Int -> Int -> BytesHex
+slice h off n
+  | off < 0 || n < 0 || off + n > len h = error "slice: out of bounds"
+  | otherwise = T.substring (2 * off) (2 * n) h
+
+-- | Decode a big-endian unsigned integer, which must fit in an `Int`.
+toUint : BytesHex -> Int
+toUint h =
+  let n = len h
+      (hi, lo) = if n > 8 then (slice h 0 (n - 8), slice h (n - 8) 8) else ("", h)
+  in if T.isPrefixOf "8" lo || T.isPrefixOf "9" lo || T.isPrefixOf "a" lo || T.isPrefixOf "b" lo
+        || T.isPrefixOf "c" lo || T.isPrefixOf "d" lo || T.isPrefixOf "e" lo || T.isPrefixOf "f" lo
+        then (if len lo == 8 then error "toUint: overflow" else decode hi lo)
+        else decode hi lo
+  where
+    decode hi lo
+      | T.dropWhile (== "0") hi /= "" = error "toUint: overflow"
+      | otherwise = fromSomeNote "toUint: not hex" (fromHex lo)
