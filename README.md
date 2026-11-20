@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+
 # IBC Contracts
 
 [![Full Actions](https://github.com/lfdt-ibc/ibc-contracts/actions/workflows/e2e-full.yml/badge.svg)](https://github.com/lfdt-ibc/ibc-contracts/actions)
@@ -258,7 +260,7 @@ The IBC Solidity contracts use [`AccessManager`](https://github.com/OpenZeppelin
 
 ## License
 
-Apache License, Version 2.0. See [LICENSE.md](LICENSE.md).
+Code is licensed under the Apache License, Version 2.0; see [LICENSE.md](LICENSE.md). Documentation is licensed under [CC BY 4.0](docs/LICENSE). The SPDX header on each file records which applies, except in snapshots of the documentation at past releases, which carry none; see [CONTRIBUTING.md](CONTRIBUTING.md#copyright-and-license).
 
 ## Acknowledgements
 
