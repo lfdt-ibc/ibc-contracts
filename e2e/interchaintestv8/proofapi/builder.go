@@ -284,6 +284,43 @@ func (b *ConfigBuilder) BesuToEth(p BesuToEthParams) *ConfigBuilder {
 }
 
 // =============================================================================
+// Linea → EVM
+// =============================================================================
+
+// LineaToEthParams contains parameters for linea_to_eth module.
+type LineaToEthParams struct {
+	SrcChainID string
+	DstChainID string
+	SrcRPC     string
+	// SrcBeaconAPI is the beacon API of the source Maru consensus client.
+	SrcBeaconAPI string
+	DstRPC       string
+	SrcICS26     string
+	DstICS26     string
+	// DstIBCMulticall is the destination multicall that relay transactions are submitted to.
+	DstIBCMulticall string
+}
+
+// LineaToEth adds a Linea→EVM module.
+func (b *ConfigBuilder) LineaToEth(p LineaToEthParams) *ConfigBuilder {
+	module := ModuleConfig{
+		Name:     ModuleLineaToEth,
+		SrcChain: p.SrcChainID,
+		DstChain: p.DstChainID,
+		Config: LineaToEthModuleConfig{
+			SrcRPCURL:              p.SrcRPC,
+			SrcBeaconAPIURL:        p.SrcBeaconAPI,
+			SrcICS26Address:        p.SrcICS26,
+			DstRPCURL:              p.DstRPC,
+			DstICS26Address:        p.DstICS26,
+			DstIBCMulticallAddress: p.DstIBCMulticall,
+		},
+	}
+	b.modules = append(b.modules, module)
+	return b
+}
+
+// =============================================================================
 // Cosmos → Cosmos
 // =============================================================================
 

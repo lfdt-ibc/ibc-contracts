@@ -24,6 +24,7 @@ Each module runs in one direction and specializes in how it builds proofs and tr
 | `eth_to_cosmos` | EVM | Cosmos SDK | Parse EVM events, build Cosmos IBC txs | `real` — ethereum mainnet beacon API proofs<br>`mock` — dev/test mode<br>`attested` — multisig attestations |
 | `eth_to_eth` | EVM | EVM | Parse EVM events, build attested txs | `attested` — multisig attestations |
 | `besu_to_eth` | Besu BFT EVM | EVM | Parse EVM events, build EVM real-proof txs | direct Besu light-client updates + Besu account/storage proofs |
+| `linea_to_eth` | Linea | EVM | Parse EVM events, build EVM real-proof txs | direct Linea light-client updates from Maru beacon blocks + account/storage proofs |
 | `cosmos_to_cosmos` | Cosmos SDK | Cosmos SDK | Parse Cosmos events, build Cosmos IBC txs | ICS-07 light client proofs only (validator signatures and merkle proofs) |
 | `cosmos_to_solana` | Cosmos SDK | Solana | Parse Cosmos events, build Solana IBC txs | ICS-07 light client proofs only (validator signatures and merkle proofs) |
 | `solana_to_cosmos` | Solana | Cosmos SDK | Parse Solana events, build Cosmos IBC txs | multisig attestations only |
@@ -137,6 +138,14 @@ Module configuration varies by module type:
   - `dst_ibc_multicall_address`: Destination `IBCMulticall` contract address that relay and update client
     transactions are submitted to.
   - `consensus_type`: Source Besu consensus type, `qbft` or `ibft2`. Selects the commit-seal signing form of the headers submitted in client updates.
+- `linea_to_eth`:
+  - `src_rpc_url`: Source Linea execution RPC endpoint.
+  - `src_beacon_api_url`: Beacon API endpoint of the source Maru consensus client, which serves the sealed beacon blocks.
+  - `src_ics26_address`: Source IBC router contract address.
+  - `dst_rpc_url`: Destination EVM RPC endpoint.
+  - `dst_ics26_address`: Destination IBC router contract address.
+  - `dst_ibc_multicall_address`: Destination `IBCMulticall` contract address that relay and update client
+    transactions are submitted to.
 - `cosmos_to_cosmos`:
   - `src_rpc_url`: RPC endpoint for the source chain.
   - `target_rpc_url`: RPC endpoint for the destination chain.
@@ -173,6 +182,17 @@ Operational notes:
 - `RelayByTx` uses real Besu proofs: the signing-form header RLP and commit seals in the client update, and a `MembershipProof` per packet call carrying the consensus state preimage and the storage proof for recv/ack/timeout verification. The client update carries no account proof.
 - `RelayByTx` fetches `eth_getProof` at the latest source block rather than at the event heights, so it keeps working after a Bonsai-backed Besu node has pruned the state at those heights. Packets that were already completed on the source chain by then (a recv whose commitment is gone, a timeout whose receipt exists) are skipped with a warning instead of being included as calls that would revert; if nothing is left, the request fails.
 - Within a batch only the first packet call carries the router account proof. The destination light client caches the proven storage root in transient storage for the remaining calls, so the destination chain must have Cancun (EIP-1153) enabled. See `ibc-solidity/contracts/light-clients/besu/README.md`.
+
+
+## `linea_to_eth` create-client parameters
+
+`linea_to_eth` is a proof of concept. Its `CreateClient` returns only deployment calldata for `LineaLightClient`, bound to `dst_ics26_address` as the only router that can drive the client, and takes the same parameters as `besu_to_eth`: `trusting_period`, `max_clock_drift`, and optionally `trust_level` and `trusted_height`. Register the deployed client with the same counterparty merkle prefix as a Besu light client, `[src_ics26_address, IBCSTORE_STORAGE_SLOT, ""]`.
+
+Operational notes:
+- Heights are Linea execution block numbers. The module reads the latest height from Maru's beacon head rather than from the execution RPC, because the execution client imports a block before Maru serves its sealed beacon block.
+- A client update carries the beacon block header, the full RLP-encoded beacon block body, the validator set and the commit seals. The body holds every transaction of the block, so the update's calldata grows with the block.
+- Maru's beacon API returns blocks as JSON, so the module rebuilds the body RLP and fails if it does not hash to the header's body root.
+- `UpdateClient` is a single direct update, and `RelayByTx` proves against the latest source block, as in `besu_to_eth`.
 
 ## Using the gRPC API
 

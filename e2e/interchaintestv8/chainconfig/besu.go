@@ -367,10 +367,15 @@ func (c BesuChain) validatorRPC(ctx context.Context, service, method string, par
 }
 
 func (c BesuChain) runCompose(ctx context.Context, args ...string) ([]byte, error) {
+	return runDockerCompose(ctx, c.projectName, c.projectDir, args...)
+}
+
+// runDockerCompose runs docker compose on the compose file materialized in projectDir.
+func runDockerCompose(ctx context.Context, projectName, projectDir string, args ...string) ([]byte, error) {
 	composeArgs := []string{
 		"compose",
-		"--project-name", c.projectName,
-		"--file", filepath.Join(c.projectDir, besuComposeFile),
+		"--project-name", projectName,
+		"--file", filepath.Join(projectDir, besuComposeFile),
 	}
 	composeArgs = append(composeArgs, args...)
 
@@ -591,12 +596,13 @@ func sendBesuProbeTx(ctx context.Context, client *ethclient.Client, key *ecdsa.P
 	}
 
 	tx := ethtypes.NewTx(&ethtypes.DynamicFeeTx{
-		ChainID:   chainID,
-		Nonce:     nonce,
-		To:        &from,
-		Value:     big.NewInt(0),
-		Gas:       21_000,
-		GasFeeCap: big.NewInt(1),
+		ChainID: chainID,
+		Nonce:   nonce,
+		To:      &from,
+		Value:   big.NewInt(0),
+		Gas:     21_000,
+		// Covers the base fee of the Linea network. The Besu networks have none.
+		GasFeeCap: big.NewInt(1_000_000_000),
 		GasTipCap: big.NewInt(1),
 	})
 

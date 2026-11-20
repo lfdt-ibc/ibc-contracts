@@ -60,6 +60,8 @@ const (
 	EnvKeyGenerateTendermintLightClientFixtures = "GENERATE_TENDERMINT_LIGHT_CLIENT_FIXTURES"
 	// EnvKeyGenerateBesuLightClientFixtures Generate fixtures for the Besu light client tests if set to true.
 	EnvKeyGenerateBesuLightClientFixtures = "GENERATE_BESU_LIGHT_CLIENT_FIXTURES"
+	// EnvKeyGenerateLineaLightClientFixtures Generate fixtures for the Linea light client tests if set to true.
+	EnvKeyGenerateLineaLightClientFixtures = "GENERATE_LINEA_LIGHT_CLIENT_FIXTURES"
 	// The log level for the Rust logger.
 	EnvKeyRustLog = "RUST_LOG"
 
@@ -105,6 +107,8 @@ const (
 	BesuConsensusQBFT = "qbft"
 	// BesuConsensusIBFT2 runs Besu networks with IBFT 2.0 consensus.
 	BesuConsensusIBFT2 = "ibft2"
+	// LineaConsensusMaru runs a Linea network, whose Maru consensus client runs QBFT over beacon blocks.
+	LineaConsensusMaru = "maru"
 
 	// EthTestnetType_None disables Ethereum chain setup
 	EthTestnetType_None = "none"
@@ -213,6 +217,8 @@ const (
 	// Relative to the repo root (e2e suites chdir there), and shared with the Foundry suite in
 	// ibc-solidity/test/besu-bft (which resolves it via vm.projectRoot()).
 	BesuBFTFixturesDir = "ibc-solidity/test/besu-bft/fixtures"
+	// LineaFixturesDir is the directory where the Linea light client fixtures are stored, relative to the repo root.
+	LineaFixturesDir = "ibc-solidity/test/linea/fixtures"
 
 	// IbcCommitmentSlotHex is the storage slot in the IBC solidity contract for the IBC commitments.
 	IbcCommitmentSlotHex = ics26router.IbcStoreStorageSlot

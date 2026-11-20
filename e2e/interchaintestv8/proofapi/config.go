@@ -21,6 +21,7 @@ const (
 	ModuleEthToCosmosCompat = "eth_to_cosmos_compat"
 	ModuleEthToEth          = "eth_to_eth"
 	ModuleBesuToEth         = "besu_to_eth"
+	ModuleLineaToEth        = "linea_to_eth"
 	ModuleSolanaToCosmos    = "solana_to_cosmos"
 	ModuleCosmosToSolana    = "cosmos_to_solana"
 	ModuleEthToSolana       = "eth_to_solana"
@@ -241,6 +242,18 @@ type BesuToEthModuleConfig struct {
 	// DstIBCMulticallAddress is the destination multicall that relay transactions are submitted to.
 	DstIBCMulticallAddress string `json:"dst_ibc_multicall_address"`
 	ConsensusType          string `json:"consensus_type"`
+}
+
+// LineaToEthModuleConfig represents the configuration for linea_to_eth module.
+type LineaToEthModuleConfig struct {
+	SrcRPCURL string `json:"src_rpc_url"`
+	// SrcBeaconAPIURL is the beacon API of the source Maru consensus client.
+	SrcBeaconAPIURL string `json:"src_beacon_api_url"`
+	SrcICS26Address string `json:"src_ics26_address"`
+	DstRPCURL       string `json:"dst_rpc_url"`
+	DstICS26Address string `json:"dst_ics26_address"`
+	// DstIBCMulticallAddress is the destination multicall that relay transactions are submitted to.
+	DstIBCMulticallAddress string `json:"dst_ibc_multicall_address"`
 }
 
 // AttestorConfig represents the attestor configuration section

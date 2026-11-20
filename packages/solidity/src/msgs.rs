@@ -48,6 +48,9 @@ alloy_sol_types::sol!(
 alloy_sol_types::sol!(
     "../../ibc-solidity/contracts/light-clients/besu/msgs/IBesuLightClientMsgs.sol"
 );
+alloy_sol_types::sol!(
+    "../../ibc-solidity/contracts/light-clients/linea/msgs/ILineaLightClientMsgs.sol"
+);
 
 #[cfg(feature = "rpc")]
 impl ISP1Msgs::SP1Proof {
