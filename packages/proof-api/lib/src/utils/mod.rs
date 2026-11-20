@@ -64,6 +64,7 @@ where
 pub mod attestor;
 pub mod tracing_layer;
 
+pub mod canton;
 /// Utils useful for type conversions for attestor clients
 pub mod cosmos;
 pub mod cosmos_attested;

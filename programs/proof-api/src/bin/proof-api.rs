@@ -6,10 +6,12 @@ use clap::Parser;
 use proof_api::cli::{Commands, ProofApiCli};
 use proof_api::observability::init_observability;
 use proof_api_besu_to_eth::BesuToEthProofApiModule;
+use proof_api_canton_to_eth::CantonToEthProofApiModule;
 use proof_api_core::{builder::ProofApiBuilder, config::ProofApiConfig};
 use proof_api_cosmos_to_cosmos::CosmosToCosmosProofApiModule;
 use proof_api_cosmos_to_eth::CosmosToEthProofApiModule;
 use proof_api_cosmos_to_solana::CosmosToSolanaProofApiModule;
+use proof_api_eth_to_canton::EthToCantonProofApiModule;
 use proof_api_eth_to_cosmos::EthToCosmosProofApiModule;
 use proof_api_eth_to_cosmos_compat::EthToCosmosCompatProofApiModule;
 use proof_api_eth_to_eth::EthToEthProofApiModule;
@@ -53,6 +55,8 @@ async fn main() -> anyhow::Result<()> {
             proof_api_builder.add_module(CosmosToSolanaProofApiModule);
             proof_api_builder.add_module(EthToSolanaProofApiModule);
             proof_api_builder.add_module(SolanaToEthProofApiModule);
+            proof_api_builder.add_module(CantonToEthProofApiModule);
+            proof_api_builder.add_module(EthToCantonProofApiModule);
 
             // Start the metrics server.
             tokio::spawn(async move {

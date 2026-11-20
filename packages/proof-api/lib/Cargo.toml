@@ -20,6 +20,8 @@ serde      = { workspace = true, features = ["derive"] }
 prost      = { workspace = true, features = ["std"] }
 serde_json = { workspace = true }
 base64     = { workspace = true }
+reqwest    = { workspace = true, features = ["json", "rustls-tls"] }
+time       = { workspace = true, features = ["parsing"] }
 
 async-trait   = { workspace = true }
 anyhow        = { workspace = true, features = ["std"] }

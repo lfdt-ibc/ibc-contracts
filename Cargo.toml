@@ -25,6 +25,8 @@ members = [
     "packages/proof-api/modules/cosmos-to-solana",
     "packages/proof-api/modules/eth-to-solana",
     "packages/proof-api/modules/solana-to-eth",
+    "packages/proof-api/modules/canton-to-eth",
+    "packages/proof-api/modules/eth-to-canton",
     "packages/sp1-ics07-tendermint-prover",
 
     # Programs (binaries)
@@ -66,6 +68,8 @@ proof-api-solana-to-cosmos     = { path = "packages/proof-api/modules/solana-to-
 proof-api-cosmos-to-solana     = { path = "packages/proof-api/modules/cosmos-to-solana", default-features = false }
 proof-api-eth-to-solana        = { path = "packages/proof-api/modules/eth-to-solana", default-features = false }
 proof-api-solana-to-eth        = { path = "packages/proof-api/modules/solana-to-eth", default-features = false }
+proof-api-canton-to-eth        = { path = "packages/proof-api/modules/canton-to-eth", default-features = false }
+proof-api-eth-to-canton        = { path = "packages/proof-api/modules/eth-to-canton", default-features = false }
 ibc-eureka-utils                        = { path = "packages/utils", default-features = false }
 ibc-eureka-constrained-types            = { path = "packages/constrained_types", default-features = false }
 sp1-ics07-tendermint-prover             = { path = "packages/sp1-ics07-tendermint-prover", default-features = false }

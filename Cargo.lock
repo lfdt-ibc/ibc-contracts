@@ -8618,10 +8618,12 @@ dependencies = [
  "opentelemetry_sdk",
  "prometheus",
  "proof-api-besu-to-eth",
+ "proof-api-canton-to-eth",
  "proof-api-core",
  "proof-api-cosmos-to-cosmos",
  "proof-api-cosmos-to-eth",
  "proof-api-cosmos-to-solana",
+ "proof-api-eth-to-canton",
  "proof-api-eth-to-cosmos",
  "proof-api-eth-to-cosmos-compat",
  "proof-api-eth-to-eth",
@@ -8651,6 +8653,22 @@ dependencies = [
  "proof-api-core",
  "proof-api-lib",
  "rlp 0.6.1",
+ "serde",
+ "serde_json",
+ "tonic 0.13.1",
+ "tracing",
+]
+
+[[package]]
+name = "proof-api-canton-to-eth"
+version = "0.1.0"
+dependencies = [
+ "alloy 2.0.4",
+ "anyhow",
+ "async-trait",
+ "ibc-eureka-solidity-types 0.1.0",
+ "proof-api-core",
+ "proof-api-lib",
  "serde",
  "serde_json",
  "tonic 0.13.1",
@@ -8755,6 +8773,22 @@ dependencies = [
  "tendermint-proto",
  "tendermint-rpc",
  "tokio",
+ "tonic 0.13.1",
+ "tracing",
+]
+
+[[package]]
+name = "proof-api-eth-to-canton"
+version = "0.1.0"
+dependencies = [
+ "alloy 2.0.4",
+ "anyhow",
+ "async-trait",
+ "ibc-eureka-solidity-types 0.1.0",
+ "proof-api-core",
+ "proof-api-lib",
+ "serde",
+ "serde_json",
  "tonic 0.13.1",
  "tracing",
 ]
@@ -8879,6 +8913,7 @@ dependencies = [
  "moka",
  "opentelemetry 0.33.1",
  "prost 0.13.5",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -8895,6 +8930,7 @@ dependencies = [
  "tendermint-light-client-verifier",
  "tendermint-rpc",
  "thiserror 2.0.18",
+ "time",
  "tokio",
  "tonic 0.13.1",
  "tonic-build 0.13.1",
