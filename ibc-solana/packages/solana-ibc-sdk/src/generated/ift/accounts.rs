@@ -42,7 +42,7 @@ pub struct IFTAppState {
     pub bump: u8,
     /// Admin authority for IFT
     pub admin: Pubkey,
-    /// Whether IFT is paused (blocks mint and transfer, not refunds)
+    /// Whether IFT is paused (blocks mint, transfer, and refund finalization)
     pub paused: bool,
     /// Pending admin for two-step transfer
     pub pending_admin: Option<Pubkey>,

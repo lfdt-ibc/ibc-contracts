@@ -193,7 +193,7 @@ Tx 2 - Anyone claims refund:
 | `register_ift_bridge` | Register counterparty IFT contract for a destination chain |
 | `remove_ift_bridge` | Deactivate/remove a registered bridge |
 | `set_admin` | Transfer admin authority to a new pubkey |
-| `set_paused` | Pause or unpause the token (blocks mint and transfer, not refunds) |
+| `set_paused` | Pause or unpause IFT operations (blocks mint, transfer, and refund finalization) |
 | `set_mint_rate_limit` | Set daily mint rate limit (0 = no limit) |
 | `admin_mint` | Mint tokens to any account (respects rate limits and pause state) |
 | `revoke_mint_authority` | Reclaim mint authority from IFT PDA (closes app state) |
@@ -211,7 +211,7 @@ Tx 2 - Anyone claims refund:
 
 1. **Burn Authorization**: Only token owner can burn (standard SPL token semantics)
 
-2. **Mint Authorization**: Only IFT's mint authority PDA can mint, via three paths: incoming GMP calls validated against registered bridge (`ift_mint`), refund operations validated by pending transfer records (`finalize_transfer`), or direct admin mint (`admin_mint`). All mint paths (except refunds) respect daily rate limits and pause state.
+2. **Mint Authorization**: Only IFT's mint authority PDA can mint, via three paths: incoming GMP calls validated against registered bridge (`ift_mint`), refund operations validated by pending transfer records (`finalize_transfer`), or direct admin mint (`admin_mint`). All three mint paths respect daily rate limits and pause state.
 
 3. **Empty Salt Requirement**: Salt is hardcoded empty on send and validated empty on receive via GMP account PDA derivation. Prevents unauthorized minting via alternate GMP account PDAs.
 

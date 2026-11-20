@@ -26,7 +26,7 @@ The client implements a mandatory chunked upload mechanism for all header update
 - **Relayer Isolation**: Each relayer's uploads are completely isolated via PDAs keyed by submitter address
 - **Rent Economics**: Relayers are incentivized to clean up failed uploads as they pay the rent
 - **Atomic Updates**: Header assembly and client updates happen atomically - either all succeed or all fail
-- **Automatic Cleanup**: Successful assembly automatically closes temporary accounts and returns rent
+- **Explicit Rent Reclamation**: After assembly (or a failed upload), relayers call `cleanup_incomplete_upload` to close temporary chunk and signature verification accounts and reclaim rent
 
 ## Program Instructions
 

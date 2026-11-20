@@ -32,8 +32,8 @@ impl ConsensusStateStore {
 ///
 /// Tendermint headers can exceed the Solana transaction size limit, so
 /// they are uploaded in chunks across multiple transactions. Once all
-/// chunks are present the `update_client` instruction reassembles and
-/// verifies the full header, then closes these accounts to reclaim rent.
+/// chunks are present the `assemble_and_update_client` instruction reassembles
+/// and verifies the full header; rent is reclaimed via `cleanup_incomplete_upload`.
 #[account]
 #[derive(InitSpace)]
 pub struct HeaderChunk {

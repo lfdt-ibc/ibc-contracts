@@ -91,7 +91,7 @@ pub mod ics07_tendermint {
     }
 
     /// Assemble chunks and update the client
-    /// Automatically cleans up all chunks after successful update
+    /// Chunk and signature verification rent is reclaimed separately via `cleanup_incomplete_upload`
     pub fn assemble_and_update_client<'info>(
         ctx: Context<'_, '_, 'info, 'info, AssembleAndUpdateClient<'info>>,
         target_height: u64,
