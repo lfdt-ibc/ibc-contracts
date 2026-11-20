@@ -585,6 +585,56 @@ func (b *ConfigBuilder) SolanaToEthAttested(p SolanaToEthAttestedParams) *Config
 }
 
 // =============================================================================
+// Canton ↔ Eth (mock light clients)
+// =============================================================================
+
+// CantonEthParams contains parameters for the Canton→Eth and Eth→Canton modules.
+type CantonEthParams struct {
+	CantonChainID string
+	EthChainID    string
+	LedgerAPI     string
+	OperatorParty string
+	RelayerParty  string
+	GMPParty      string
+	EthRPC        string
+	ICS26Address  string
+	IBCMulticall  string
+}
+
+// CantonToEth adds a Canton→Eth module, which relays with empty proofs.
+func (b *ConfigBuilder) CantonToEth(p CantonEthParams) *ConfigBuilder {
+	return b.AddModule(ModuleConfig{
+		Name:     ModuleCantonToEth,
+		SrcChain: p.CantonChainID,
+		DstChain: p.EthChainID,
+		Config: CantonToEthModuleConfig{
+			SrcLedgerApiUrl:        p.LedgerAPI,
+			SrcParty:               p.RelayerParty,
+			DstRpcUrl:              p.EthRPC,
+			DstIcs26Address:        p.ICS26Address,
+			DstIbcMulticallAddress: p.IBCMulticall,
+		},
+	})
+}
+
+// EthToCanton adds an Eth→Canton module, which relays with empty proofs.
+func (b *ConfigBuilder) EthToCanton(p CantonEthParams) *ConfigBuilder {
+	return b.AddModule(ModuleConfig{
+		Name:     ModuleEthToCanton,
+		SrcChain: p.EthChainID,
+		DstChain: p.CantonChainID,
+		Config: EthToCantonModuleConfig{
+			SrcRpcUrl:        p.EthRPC,
+			SrcIcs26Address:  p.ICS26Address,
+			DstLedgerApiUrl:  p.LedgerAPI,
+			DstOperatorParty: p.OperatorParty,
+			DstRelayerParty:  p.RelayerParty,
+			DstGmpParty:      p.GMPParty,
+		},
+	})
+}
+
+// =============================================================================
 // Helper constructors for common prover configurations
 // =============================================================================
 

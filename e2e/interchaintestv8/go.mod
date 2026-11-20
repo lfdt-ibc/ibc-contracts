@@ -21,6 +21,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.8
 	github.com/gagliardetto/binary v0.8.0
 	github.com/gagliardetto/solana-go v1.25.0
+	github.com/google/uuid v1.6.0
 	github.com/holiman/uint256 v1.3.2
 	github.com/kurtosis-tech/kurtosis/api/golang v1.22.2
 	github.com/lfdt-ibc/ibc-contracts/e2e/interchaintestv8/solana/go-anchor v0.0.0-00010101000000-000000000000
@@ -183,7 +184,6 @@ require (
 	github.com/google/gofuzz v1.2.1-0.20220503160820-4a35382e8fc8 // indirect
 	github.com/google/orderedcode v0.0.1 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect

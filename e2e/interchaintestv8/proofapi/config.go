@@ -25,6 +25,8 @@ const (
 	ModuleCosmosToSolana    = "cosmos_to_solana"
 	ModuleEthToSolana       = "eth_to_solana"
 	ModuleSolanaToEth       = "solana_to_eth"
+	ModuleCantonToEth       = "canton_to_eth"
+	ModuleEthToCanton       = "eth_to_canton"
 )
 
 // Config represents the proof API configuration structure aligned with the Rust ProofApiConfig
@@ -327,4 +329,21 @@ type SolanaToEthModuleConfig struct {
 	Ics26Address         string        `json:"ics26_address"`
 	IbcMulticallAddress  string        `json:"ibc_multicall_address"`
 	Mode                 TxBuilderMode `json:"mode"`
+}
+
+type CantonToEthModuleConfig struct {
+	SrcLedgerApiUrl        string `json:"src_ledger_api_url"`
+	SrcParty               string `json:"src_party"`
+	DstRpcUrl              string `json:"dst_rpc_url"`
+	DstIcs26Address        string `json:"dst_ics26_address"`
+	DstIbcMulticallAddress string `json:"dst_ibc_multicall_address"`
+}
+
+type EthToCantonModuleConfig struct {
+	SrcRpcUrl        string `json:"src_rpc_url"`
+	SrcIcs26Address  string `json:"src_ics26_address"`
+	DstLedgerApiUrl  string `json:"dst_ledger_api_url"`
+	DstOperatorParty string `json:"dst_operator_party"`
+	DstRelayerParty  string `json:"dst_relayer_party"`
+	DstGmpParty      string `json:"dst_gmp_party"`
 }
