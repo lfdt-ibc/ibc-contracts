@@ -51,7 +51,7 @@ func (c LineaChain) WaitForTransactionHandling(ctx context.Context) error {
 	return waitForBesuTransactionHandling(ctx, c.RPC, c.Faucet)
 }
 
-// SpinUpLinea starts the embedded Linea fixture with a genesis at the current time.
+// SpinUpLinea starts the embedded Linea fixture.
 func SpinUpLinea(ctx context.Context) (chain LineaChain, err error) {
 	faucet, err := crypto.HexToECDSA(testvalues.E2EDeployerPrivateKeyHex)
 	if err != nil {
@@ -160,8 +160,9 @@ func (c LineaChain) hostEndpoint(ctx context.Context, service, port string) (str
 	return "http://127.0.0.1:" + hostPort, nil
 }
 
-// patchLineaGenesis sets the chain ID and, for the execution genesis, the current time as its timestamp. Maru builds
-// on the execution genesis, and a stale timestamp would make it produce a block per second of the gap.
+// patchLineaGenesis sets the chain ID and, for the execution genesis, a timestamp a minute in the past. Besu only
+// builds the block Maru asks for if its timestamp is after the genesis one, and Maru's clock in the Docker VM can
+// trail the host's by seconds. With a genesis at the host's current time, Maru has failed to produce its first block.
 func patchLineaGenesis(path string, chainID uint64) error {
 	contents, err := os.ReadFile(path)
 	if err != nil {
@@ -174,7 +175,7 @@ func patchLineaGenesis(path string, chainID uint64) error {
 	}
 	if config, ok := genesis["config"].(map[string]any); ok && config["chainId"] != nil {
 		config["chainId"] = chainID
-		genesis["timestamp"] = hexutil.EncodeUint64(uint64(time.Now().Unix()))
+		genesis["timestamp"] = hexutil.EncodeUint64(uint64(time.Now().Add(-time.Minute).Unix()))
 	} else {
 		genesis["chainId"] = chainID
 	}

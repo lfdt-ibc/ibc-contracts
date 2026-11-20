@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -22,6 +23,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	ibchostv2 "github.com/lfdt-ibc/ibc-go/v11/modules/core/24-host/v2"
+
+	"github.com/cosmos/interchaintest/v11/testutil"
 
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/ics26router"
 	"github.com/lfdt-ibc/ibc-contracts/packages/go-abigen/lineamsgs"
@@ -248,12 +251,19 @@ type maruAttestation struct {
 
 // fetchMaruBlock fetches the sealed beacon block that carries the execution block executionHeight.
 func fetchMaruBlock(ctx context.Context, beaconAPI string, executionHeight uint64) (*maruBlock, error) {
-	head, err := fetchMaruBlockByID(ctx, beaconAPI, "head")
+	// The execution client imports a block before Maru serves its sealed beacon block, so the beacon head can
+	// briefly trail an execution height that the caller has already seen.
+	var head *maruBlock
+	err := testutil.WaitForCondition(30*time.Second, 500*time.Millisecond, func() (bool, error) {
+		var err error
+		head, err = fetchMaruBlockByID(ctx, beaconAPI, "head")
+		return err == nil && head.payload.BlockNumber >= executionHeight, err
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("wait for the beacon block of execution block %d: %w", executionHeight, err)
 	}
 	// Every beacon block carries the next execution block, so the two numbers advance together.
-	if executionHeight > head.payload.BlockNumber || head.payload.BlockNumber-executionHeight > head.header.Number {
+	if head.payload.BlockNumber-executionHeight > head.header.Number {
 		return nil, fmt.Errorf("no beacon block carries execution block %d", executionHeight)
 	}
 	number := head.header.Number - (head.payload.BlockNumber - executionHeight)

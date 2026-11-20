@@ -107,7 +107,9 @@ Linea execution blocks carry a standard Merkle Patricia state root, and `eth_get
 
 - **Finality.** Blocks sealed by Maru's validator are final for QBFT but are soft-finalized from Ethereum's point of view until their proof lands on L1. This client trusts the Maru validator set, as the Besu client trusts a Besu validator set.
 - **Empty blocks.** Linea does not produce empty blocks, so the chain's time only advances when it has transactions. Timeouts of packets sent to Linea need a Linea block at or after the timeout.
-- **Forks.** The client reads execution payload fields by position. A Maru fork that changes the header or body encoding needs a new client.
+- **Forks.** The client is not upgradeable, so a Maru fork that changes what it verifies needs a new client. Two are visible in Maru's source today:
+  - `QBFT_PHASE1`, which Maru currently only uses in tests, zeroes the round and proposer of the header inside the beacon state. Commit seals keep signing the full header, but the beacon state root check of this client would fail.
+  - The Amsterdam execution fork appends fields to the execution payload. The client reads the payload fields it needs by position and ignores trailing ones, so it keeps working, but the `linea_to_eth` proof API module rebuilds the body from Maru's JSON API with the current 14 fields and would need them added.
 
 ## Tests
 
