@@ -82,3 +82,60 @@ ABI calldata bytes:
 | 16 | 2,020 | 2,308 | 2,820 | 3,364 |
 | 128 | 2,564 | 2,852 | 3,364 | 3,908 |
 | 1024 | 3,140 | 3,428 | 3,940 | 4,484 |
+
+## Linea light-client benchmarks
+
+These isolated transactions use the live Maru beacon blocks and proofs in `test/linea/fixtures/maru.json`, sealed by Linea's single validator. They measure direct light-client calls and are not directly comparable with the SP1 packet operations above.
+
+| Operation | Gas | ABI calldata bytes |
+| --- | ---: | ---: |
+| Adjacent client update | 113,294 | 1,540 |
+| Non-adjacent client update | 120,395 | 2,340 |
+| Membership verification | 155,233 | 2,404 |
+| Non-membership verification | 168,109 | 2,340 |
+
+## Linea light-client scaling benchmarks
+
+These isolated transactions use beacon blocks and proofs produced in-process by the `MaruSimSuite` chain simulator in `test/linea/utils`.
+
+A client update carries the whole beacon block body, so its cost grows with the transactions of the block. The blocks below are sealed by one validator and carry the given number of non-zero transaction bytes. The benchmark EVM is Cancun, which charges 16 gas per non-zero calldata byte. A chain with EIP-7623 charges a transaction at least 40 gas per non-zero calldata byte, which is more than these totals for the larger blocks.
+
+| Transaction bytes | Client update gas | ABI calldata bytes |
+| ---: | ---: | ---: |
+| 0 | 112,034 | 1,540 |
+| 1,024 | 129,371 | 2,564 |
+| 16,384 | 381,653 | 17,924 |
+| 131,072 | 2,293,885 | 132,612 |
+| 1,048,576 | 19,397,405 | 1,050,116 |
+
+Linea runs one validator. The blocks below have no transactions and are sealed by every validator of a larger set.
+
+| Validators | Client update gas | ABI calldata bytes |
+| ---: | ---: | ---: |
+| 1 | 112,034 | 1,540 |
+| 4 | 144,508 | 2,436 |
+| 7 | 176,664 | 3,300 |
+| 16 | 273,152 | 5,924 |
+| 32 | 445,301 | 10,628 |
+| 64 | 790,168 | 20,004 |
+| 100 | 1,179,851 | 30,564 |
+
+Membership verification with one validator against a world state trie with the given number of accounts (router included) and a router storage trie with the given number of commitments plus the ERC-1967 implementation slot.
+
+Gas:
+
+| Accounts | 1 commitments | 16 commitments | 128 commitments | 1024 commitments |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 96,332 | 101,075 | 131,384 | 162,194 |
+| 16 | 125,388 | 130,132 | 160,430 | 191,241 |
+| 128 | 156,222 | 160,990 | 191,289 | 222,101 |
+| 1024 | 187,581 | 192,338 | 222,638 | 253,463 |
+
+ABI calldata bytes:
+
+| Accounts | 1 commitments | 16 commitments | 128 commitments | 1024 commitments |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 1,476 | 1,764 | 2,276 | 2,820 |
+| 16 | 1,924 | 2,212 | 2,724 | 3,268 |
+| 128 | 2,468 | 2,756 | 3,268 | 3,812 |
+| 1024 | 3,044 | 3,332 | 3,844 | 4,388 |

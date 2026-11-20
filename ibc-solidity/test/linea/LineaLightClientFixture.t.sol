@@ -89,12 +89,7 @@ contract LineaLightClientFixtureTest is Test {
 
     function test_verifyMembership() public {
         _update(".nonAdjacentUpdate");
-        ILightClientMsgs.MsgVerifyMembership memory msg_ = ILightClientMsgs.MsgVerifyMembership({
-            proof: json.readBytes(".membership.proof"),
-            proofHeight: IICS02ClientMsgs.Height(0, uint64(json.readUint(".membership.proofHeight"))),
-            path: _path(".membership.path"),
-            value: json.readBytes(".membership.value")
-        });
+        ILightClientMsgs.MsgVerifyMembership memory msg_ = _membershipMsg();
 
         vm.startPrank(ics26Router);
         assertEq(client.verifyMembership(msg_), _timestamp(".nonAdjacentUpdate"));
@@ -108,11 +103,7 @@ contract LineaLightClientFixtureTest is Test {
 
     function test_verifyNonMembership() public {
         _update(".nonAdjacentUpdate");
-        ILightClientMsgs.MsgVerifyNonMembership memory msg_ = ILightClientMsgs.MsgVerifyNonMembership({
-            proof: json.readBytes(".nonMembership.proof"),
-            proofHeight: IICS02ClientMsgs.Height(0, uint64(json.readUint(".nonMembership.proofHeight"))),
-            path: _path(".nonMembership.path")
-        });
+        ILightClientMsgs.MsgVerifyNonMembership memory msg_ = _nonMembershipMsg();
 
         vm.startPrank(ics26Router);
         assertEq(client.verifyNonMembership(msg_), _timestamp(".nonAdjacentUpdate"));
@@ -132,6 +123,23 @@ contract LineaLightClientFixtureTest is Test {
         }
         vm.prank(ics26Router);
         return client.updateClient(json.readBytes(string.concat(key, ".updateMsg")));
+    }
+
+    function _membershipMsg() internal view returns (ILightClientMsgs.MsgVerifyMembership memory) {
+        return ILightClientMsgs.MsgVerifyMembership({
+            proof: json.readBytes(".membership.proof"),
+            proofHeight: IICS02ClientMsgs.Height(0, uint64(json.readUint(".membership.proofHeight"))),
+            path: _path(".membership.path"),
+            value: json.readBytes(".membership.value")
+        });
+    }
+
+    function _nonMembershipMsg() internal view returns (ILightClientMsgs.MsgVerifyNonMembership memory) {
+        return ILightClientMsgs.MsgVerifyNonMembership({
+            proof: json.readBytes(".nonMembership.proof"),
+            proofHeight: IICS02ClientMsgs.Height(0, uint64(json.readUint(".nonMembership.proofHeight"))),
+            path: _path(".nonMembership.path")
+        });
     }
 
     function _height(string memory key) internal view returns (uint64) {

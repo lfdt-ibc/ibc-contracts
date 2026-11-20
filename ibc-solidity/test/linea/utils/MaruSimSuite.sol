@@ -28,12 +28,13 @@ import { SimWorldState } from "../../besu-bft/utils/SimWorldState.sol";
 contract MaruSimSuite is Test, SimWorldState {
     using BeaconBlock for ILineaLightClientMsgs.BeaconBlockHeader;
 
-    /// @dev `number`, `timestamp` and `stateRoot` are the execution payload fields. `seal` derives `header`,
-    /// `bodyRlp` and `commitSeals` from the other fields, so edit those before sealing.
+    /// @dev `number`, `timestamp`, `stateRoot` and `transactions` are the execution payload fields. `seal` derives
+    /// `header`, `bodyRlp` and `commitSeals` from the other fields, so edit those before sealing.
     struct Block {
         uint64 number;
         uint64 timestamp;
         bytes32 stateRoot;
+        bytes[] transactions;
         uint32 round;
         address[] validators;
         ILineaLightClientMsgs.BeaconBlockHeader header;
@@ -48,6 +49,7 @@ contract MaruSimSuite is Test, SimWorldState {
     address[] private _validators;
     mapping(address validator => uint256 key) private _keys;
     uint256 private _validatorCount;
+    uint256 private _accountCount;
 
     constructor() {
         IBC_ROUTER = makeAddr("sim-ibc-router");
@@ -103,6 +105,14 @@ contract MaruSimSuite is Test, SimWorldState {
     }
 
     // ---------------------------------------------------------------- world state
+
+    /// @notice Adds `count` empty accounts to the world state from the next block on, to deepen the account trie.
+    function addAccounts(uint256 count) external {
+        for (uint256 i = 0; i < count; ++i) {
+            address account = address(uint160(uint256(keccak256(abi.encode("sim-account", ++_accountCount)))));
+            _createAccount(account, 1, keccak256(""), tipHeight() + 1);
+        }
+    }
 
     function setStorage(address account, bytes32 slot, bytes32 value) external {
         _setStorage(account, slot, value, tipHeight() + 1);
@@ -293,8 +303,8 @@ contract MaruSimSuite is Test, SimWorldState {
         return abi.encode(ILineaLightClientMsgs.MembershipProof(consensusState(height), accountNodes, storageNodes));
     }
 
-    /// @dev Maru's beacon block body `[prevCommitSeals, executionPayload]` with an empty transaction list. Integers
-    /// are fixed-width 8-byte strings, as Maru writes them.
+    /// @dev Maru's beacon block body `[prevCommitSeals, executionPayload]`. Integers are fixed-width 8-byte strings, as
+    /// Maru writes them.
     function _bodyRlp(Block memory b, bytes[] memory prevCommitSeals) private pure returns (bytes memory) {
         bytes[] memory seals = new bytes[](prevCommitSeals.length);
         bytes[] memory seal_ = new bytes[](1);
@@ -317,7 +327,11 @@ contract MaruSimSuite is Test, SimWorldState {
         payload[10] = RLP.encode(bytes("")); // extraData
         payload[11] = RLP.encode(bytes(hex"07")); // baseFeePerGas
         payload[12] = RLP.encode(abi.encodePacked(keccak256(abi.encode(b.number, b.stateRoot)))); // blockHash
-        payload[13] = RLP.encode(new bytes[](0)); // transactions
+        bytes[] memory transactions = new bytes[](b.transactions.length);
+        for (uint256 i = 0; i < transactions.length; ++i) {
+            transactions[i] = RLP.encode(b.transactions[i]);
+        }
+        payload[13] = RLP.encode(transactions);
 
         bytes[] memory body = new bytes[](2);
         body[0] = RLP.encode(seals);

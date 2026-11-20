@@ -44,7 +44,7 @@ The published documentation for this repository lives at [ibcprotocol.dev](https
 - [Permissions and upgrades](https://ibcprotocol.dev/docs/ibc/06-ibc-solidity-contracts/06-permissions-and-upgrades) covers the roles, the proxies, and what each deployment fixes for good.
 - [Solana programs](ibc-solana/README.md) covers deployment, key generation, access control, and upgradability.
 - [`UPGRADEABILITY.md`](UPGRADEABILITY.md) is the procedure for upgrading a deployed contract.
-- [Benchmarks](ibc-solidity/benchmarks/README.md) covers SP1 Tendermint packet costs and Besu QBFT light-client operation costs.
+- [Benchmarks](ibc-solidity/benchmarks/README.md) covers SP1 Tendermint packet costs and Besu QBFT and Linea light-client operation costs.
 
 ## Releases
 

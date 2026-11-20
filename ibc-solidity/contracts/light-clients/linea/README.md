@@ -80,7 +80,9 @@ Trusted overlap and quorum use the same thresholds as the Besu client: at least 
 
 ### Update cost
 
-The body contains every transaction of the block, and all of it is calldata, because `bodyRoot` is a flat hash of the body. An empty block's body is 572 bytes. A relayer can choose any block at or after the height it needs to prove, so it can pick a small one, but a busy chain may not offer one. This is the main cost concern of the design.
+The body contains every transaction of the block, and all of it is calldata, because `bodyRoot` is a flat hash of the body. An update for a block without transactions costs about 112k gas with 1.5 KB of calldata. One for a block with 128 KiB of transactions costs about 2.3M gas at 16 gas per calldata byte, and more on a chain with the EIP-7623 calldata floor. The [benchmarks](../../../benchmarks/README.md#linea-light-client-scaling-benchmarks) have the full table.
+
+A relayer can choose any block at or after the height it needs to prove, so it can pick a small one, but a busy chain may not offer one. This is the main cost concern of the design.
 
 ## Validator set changes
 
@@ -116,3 +118,4 @@ Linea execution blocks carry a standard Merkle Patricia state root, and `eth_get
 - `test/linea/MaruSimSuite.t.sol` runs scenarios against an in-process Maru chain simulator, `test/linea/utils/MaruSimSuite.sol`.
 - `test/linea/LineaIntegration.t.sol` runs the ICS26 integration suites on Linea light clients.
 - `test/linea/LineaLightClientFixture.t.sol` verifies blocks and proofs captured from a live Maru and Besu network. Regenerate the fixture with `just solidity::generate-fixtures-linea`.
+- `test/benchmarks/LineaBenchmark.t.sol` and `LineaSimBenchmark.t.sol` produce the gas tables in the [benchmarks](../../../benchmarks/README.md). Regenerate them with `just solidity::benchmark-update`.
