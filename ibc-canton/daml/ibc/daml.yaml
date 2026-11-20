@@ -5,3 +5,5 @@ source: daml
 dependencies:
   - daml-prim
   - daml-stdlib
+data-dependencies:
+  - ../ibc-api/.daml/dist/ibc-api-0.1.0.dar

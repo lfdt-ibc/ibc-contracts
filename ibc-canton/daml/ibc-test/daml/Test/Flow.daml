@@ -1,0 +1,262 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Packet flows through the router with a mock light client and the GMP app.
+module Test.Flow where
+
+import DA.Assert
+import DA.Date (Month(Nov), date)
+import DA.Map qualified as Map
+import DA.Time (time)
+import Daml.Script
+import IBC.Abi
+import IBC.GMP
+import IBC.GMPReceiver
+import IBC.Hex
+import IBC.ICS24
+import IBC.LightClient
+import IBC.MockLightClient
+import IBC.Router
+import IBC.Types
+import Test.Counter
+
+-- | 2026-11-20T00:00:00Z.
+now : Int
+now = 1795132800
+
+localClient : Text
+localClient = "client-0"
+
+remoteClient : Text
+remoteClient = "client-7"
+
+data Env = Env
+  with
+    operator : Party
+    gmp : Party
+    relayer : Party
+    alice : Party
+    router : ContractId Router
+    client : ContractId Client
+    app : ContractId GMPApp
+    counter : ContractId Counter
+
+setup : Script Env
+setup = script do
+  setTime (time (date 2026 Nov 20) 0 0 0)
+  operator <- allocateParty "operator"
+  gmp <- allocateParty "gmp"
+  relayer <- allocateParty "relayer"
+  alice <- allocateParty "alice"
+
+  app <- submit gmp do createCmd GMPApp with gmp, operator, observers = [alice, relayer]
+  router <- submit operator do createCmd Router with operator, relayers = [relayer], ports = Map.empty
+  router <- submit operator do
+    exerciseCmd router Router_AddApp with
+      portId = gmpPortId
+      port = Port with owner = gmp, app = toInterfaceContractId app
+  -- The mock reports a counterparty time past every timeout used below.
+  lightClient <- submit operator do createCmd MockLightClient with operator, observers = [relayer], timestamp = now + 100000
+  client <- submit operator do
+    exerciseCmd router Router_AddClient with
+      clientId = localClient
+      counterpartyClientId = remoteClient
+      merklePrefix = [""]
+      lightClient = toInterfaceContractId @LightClient lightClient
+  counter <- submit alice do createCmd Counter with owner = alice, gmp, count = 0, lastCaller = None
+  pure Env with ..
+
+sendCall : Env -> ContractId Client -> Script (Int, ContractId Client)
+sendCall env client =
+  submit (actAs env.alice <> readAs env.gmp) do
+    exerciseCmd env.app GMPApp_SendCall with
+      sender = env.alice
+      routerCid = env.router
+      clientCid = client
+      receiver = "0x00000000000000000000000000000000000000ff"
+      salt = ""
+      payload = "deadbeef"
+      timeoutTimestamp = now + 3600
+      memo = ""
+
+testSendAndAck : Script ()
+testSendAndAck = script do
+  env <- setup
+  (sequence, client) <- sendCall env env.client
+  sequence === 1
+
+  [(commitmentCid, stored)] <- query @PacketCommitment env.relayer
+  let packet = stored.packet
+  packet.sourceClient === localClient
+  packet.destClient === remoteClient
+  packet.timeoutTimestamp === now + 3600
+  stored.commitment === packetCommitment packet
+  let [payload] = packet.payloads
+  decodePacketData payload.value === GMPPacketData with
+    sender = partyToText env.alice
+    receiver = "0x00000000000000000000000000000000000000ff"
+    salt = ""
+    payload = "deadbeef"
+    memo = ""
+
+  let ack = Router_AckPacket with
+        relayer = env.relayer
+        clientCid = client
+        commitmentCid
+        packet
+        acknowledgement = encodeDynamicStruct ["01"]
+        proofAcked = ""
+        proofHeight = 1
+  -- A packet that does not match the stored commitment is rejected.
+  submitMustFail env.relayer do
+    exerciseCmd env.router ack with packet = packet with timeoutTimestamp = now + 1
+  -- Only relayers may relay.
+  submitMustFail (actAs env.alice <> readAs env.relayer) do
+    exerciseCmd env.router ack with relayer = env.alice
+  submit env.relayer do exerciseCmd env.router ack
+  commitments <- query @PacketCommitment env.relayer
+  length commitments === 0
+  -- The commitment is gone, so the packet cannot be acknowledged twice.
+  submitMustFail env.relayer do exerciseCmd env.router ack
+
+  -- Sequences increase.
+  (sequence, _) <- sendCall env client
+  sequence === 2
+
+testTimeout : Script ()
+testTimeout = script do
+  env <- setup
+  (_, client) <- sendCall env env.client
+  [(commitmentCid, stored)] <- query @PacketCommitment env.relayer
+  submit env.relayer do
+    exerciseCmd env.router Router_TimeoutPacket with
+      relayer = env.relayer
+      clientCid = client
+      commitmentCid
+      packet = stored.packet
+      proofTimeout = ""
+      proofHeight = 1
+  commitments <- query @PacketCommitment env.relayer
+  length commitments === 0
+
+testTimeoutTooEarly : Script ()
+testTimeoutTooEarly = script do
+  env <- setup
+  -- A client whose counterparty has not reached the timeout yet.
+  lightClient <- submit env.operator do
+    createCmd MockLightClient with operator = env.operator, observers = [env.relayer], timestamp = now
+  client <- submit env.operator do
+    exerciseCmd env.router Router_AddClient with
+      clientId = "client-1"
+      counterpartyClientId = remoteClient
+      merklePrefix = [""]
+      lightClient = toInterfaceContractId @LightClient lightClient
+  (_, client) <- sendCall env client
+  [(commitmentCid, stored)] <- query @PacketCommitment env.relayer
+  submitMustFail env.relayer do
+    exerciseCmd env.router Router_TimeoutPacket with
+      relayer = env.relayer
+      clientCid = client
+      commitmentCid
+      packet = stored.packet
+      proofTimeout = ""
+      proofHeight = 1
+
+testSendRejectsBadTimeouts : Script ()
+testSendRejectsBadTimeouts = script do
+  env <- setup
+  let call timeoutTimestamp = GMPApp_SendCall with
+        sender = env.alice
+        routerCid = env.router
+        clientCid = env.client
+        receiver = "0x00000000000000000000000000000000000000ff"
+        salt = ""
+        payload = "deadbeef"
+        timeoutTimestamp
+        memo = ""
+  submitMustFail (actAs env.alice <> readAs env.gmp) do exerciseCmd env.app (call now)
+  submitMustFail (actAs env.alice <> readAs env.gmp) do exerciseCmd env.app (call (now + 86401))
+  -- Only the port owner can send on the GMP port directly.
+  submitMustFail (actAs env.alice <> readAs env.gmp) do
+    exerciseCmd env.router Router_SendPacket with
+      sender = env.alice
+      clientCid = env.client
+      timeoutTimestamp = now + 3600
+      payload = Payload with
+        sourcePort = gmpPortId
+        destPort = gmpPortId
+        version = gmpVersion
+        encoding = gmpEncoding
+        value = ""
+
+-- | A packet as `ICS27GMP.sol` would send it to `receiver`.
+inboundPacket : Text -> Packet
+inboundPacket receiver = Packet with
+  sequence = 5
+  sourceClient = remoteClient
+  destClient = localClient
+  timeoutTimestamp = now + 3600
+  payloads =
+    [ Payload with
+        sourcePort = gmpPortId
+        destPort = gmpPortId
+        version = gmpVersion
+        encoding = gmpEncoding
+        value = encodePacketData GMPPacketData with
+          sender = "0x00000000000000000000000000000000000000aa"
+          receiver
+          salt = "01"
+          payload = uintBE 32 7
+          memo = ""
+    ]
+
+testRecv : Script ()
+testRecv = script do
+  env <- setup
+  let packet = inboundPacket (partyToText env.alice)
+      recv = Router_RecvPacket with
+        relayer = env.relayer
+        clientCid = env.client
+        packet
+        proofCommitment = ""
+        proofHeight = 1
+        context = [coerceContractId env.counter]
+
+  -- The receiver must be a signatory of the contract the relayer picked.
+  Some disclosure <- queryDisclosure env.alice env.counter
+  submitMustFail (actAs env.relayer <> disclose disclosure) do
+    exerciseCmd env.router recv with packet = inboundPacket (partyToText env.relayer)
+  -- The packet must be addressed to this client.
+  submitMustFail (actAs env.relayer <> disclose disclosure) do
+    exerciseCmd env.router recv with packet = packet with destClient = "client-1"
+
+  -- The relayer is not a stakeholder of the receiver, so its owner discloses it.
+  submitMustFail env.relayer do exerciseCmd env.router recv
+  Some ackCid <- submit (actAs env.relayer <> disclose disclosure) do exerciseCmd env.router recv
+  Some ack <- queryContractId env.relayer ackCid
+  ack.packet === packet
+  ack.acknowledgements === [encodeDynamicStruct [uintBE 32 7]]
+  ack.commitment === packetAcknowledgementCommitment ack.acknowledgements
+
+  [(counter, state)] <- query @Counter env.alice
+  state.count === 7
+  state.lastCaller === Some AccountIdentifier with
+    clientId = localClient
+    sender = "0x00000000000000000000000000000000000000aa"
+    salt = "01"
+
+  -- Replaying the packet is a no-op.
+  [(client, _)] <- query @Client env.relayer
+  Some disclosure <- queryDisclosure env.alice counter
+  result <- submit (actAs env.relayer <> disclose disclosure) do
+    exerciseCmd env.router recv with clientCid = client, context = [coerceContractId counter]
+  result === None
+  [(_, state)] <- query @Counter env.alice
+  state.count === 7
+
+  -- The payload is checked against the GMP wire format.
+  let [payload] = packet.payloads
+  submitMustFail (actAs env.relayer <> disclose disclosure) do
+    exerciseCmd env.router recv with
+      clientCid = client
+      context = [coerceContractId counter]
+      packet = packet with sequence = 6, payloads = [payload with version = "ics27-1"]

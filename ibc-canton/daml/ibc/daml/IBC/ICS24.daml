@@ -42,3 +42,9 @@ hashPayload p =
 packetAcknowledgementCommitment : [BytesHex] -> BytesHex
 packetAcknowledgementCommitment [] = error "no acknowledgements"
 packetAcknowledgementCommitment acks = sha256 ("02" <> mconcat (map sha256 acks))
+
+-- | Append `path` to the last element of the counterparty merkle prefix.
+prefixedPath : [BytesHex] -> BytesHex -> [BytesHex]
+prefixedPath [] _ = error "invalid merkle prefix"
+prefixedPath [x] path = [x <> path]
+prefixedPath (x :: xs) path = x :: prefixedPath xs path

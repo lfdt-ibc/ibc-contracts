@@ -1,3 +1,4 @@
 packages:
+  - ./ibc-api
   - ./ibc
   - ./ibc-test

@@ -1,0 +1,127 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | ICS27 general message passing, wire-compatible with `ICS27GMP.sol`.
+--
+-- Differences forced by Daml:
+--
+--   * There is no dynamic dispatch. An inbound call targets a contract implementing
+--     'GMPReceiver'; `receiver` in the packet is the party id of one of its signatories, and the
+--     relayer supplies the contract id.
+--   * A choice cannot allocate parties, so there is no ICS27 account. The receiver is handed
+--     the 'AccountIdentifier' and trusts the GMP party to have authenticated it.
+module IBC.GMP where
+
+import DA.Crypto.Text (BytesHex, fromHex, toHex)
+import DA.Optional (fromSomeNote)
+import IBC.Abi
+import IBC.App
+import IBC.GMPReceiver
+import IBC.Router
+import IBC.Types
+
+gmpVersion : Text
+gmpVersion = "ics27-2"
+
+gmpEncoding : Text
+gmpEncoding = "application/x-solidity-abi"
+
+gmpPortId : Text
+gmpPortId = "gmpport"
+
+data GMPPacketData = GMPPacketData
+  with
+    sender : Text
+    receiver : Text
+    salt : BytesHex
+    payload : BytesHex
+    memo : Text
+  deriving (Eq, Show)
+
+encodePacketData : GMPPacketData -> BytesHex
+encodePacketData d =
+  encodeDynamicStruct [toHex d.sender, toHex d.receiver, d.salt, d.payload, toHex d.memo]
+
+decodePacketData : BytesHex -> GMPPacketData
+decodePacketData encoded = case decodeDynamicStruct 5 encoded of
+  [sender, receiver, salt, payload, memo] -> GMPPacketData with
+    sender = text sender
+    receiver = text receiver
+    salt
+    payload
+    memo = text memo
+  _ -> error "unreachable"
+  where
+    -- `fromHex` rejects the empty string.
+    text h = if h == "" then "" else fromSomeNote "invalid utf-8" (fromHex h)
+
+template GMPApp
+  with
+    gmp : Party
+    operator : Party
+      -- ^ The router operator.
+    observers : [Party]
+      -- ^ Parties that need to see the app: senders and relayers.
+  where
+    signatory gmp
+    observer operator, observers
+
+    -- | Returns the packet sequence and the new router 'Client' contract.
+    nonconsuming choice GMPApp_SendCall : (Int, ContractId Client)
+      with
+        sender : Party
+        routerCid : ContractId Router
+        clientCid : ContractId Client
+        receiver : Text
+        salt : BytesHex
+        payload : BytesHex
+        timeoutTimestamp : Int
+        memo : Text
+      controller sender
+      do
+        assertMsg "empty payload" (payload /= "")
+        exercise routerCid Router_SendPacket with
+          sender = gmp
+          clientCid
+          timeoutTimestamp
+          payload = Payload with
+            sourcePort = gmpPortId
+            destPort = gmpPortId
+            version = gmpVersion
+            encoding = gmpEncoding
+            value = encodePacketData GMPPacketData with
+              sender = partyToText sender
+              receiver
+              salt
+              payload
+              memo
+
+    interface instance IBCApp for GMPApp where
+      view = AppView with operator
+
+      onRecvPacket callback context = do
+        let payload = callback.payload
+        assertMsg "unexpected version" (payload.version == gmpVersion)
+        assertMsg "invalid source port" (payload.sourcePort == gmpPortId)
+        assertMsg "unexpected encoding" (payload.encoding == gmpEncoding)
+        assertMsg "invalid dest port" (payload.destPort == gmpPortId)
+
+        let packetData = decodePacketData payload.value
+        assertMsg "empty payload" (packetData.payload /= "")
+
+        receiverCid <- case context of
+          [cid] -> pure (coerceContractId cid : ContractId GMPReceiver)
+          _ -> abort "expected the receiver contract as context"
+        receiver <- fetch receiverCid
+        assertMsg "invalid receiver"
+          (packetData.receiver `elem` map partyToText (signatory receiver))
+
+        result <- exercise receiverCid GMPReceiver_Execute with
+          account = AccountIdentifier with
+            clientId = callback.destinationClient
+            sender = packetData.sender
+            salt = packetData.salt
+          payload = packetData.payload
+        pure (encodeDynamicStruct [result])
+
+      onAcknowledgementPacket _ _ = pure ()
+      onTimeoutPacket _ = pure ()

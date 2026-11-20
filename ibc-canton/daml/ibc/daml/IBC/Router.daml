@@ -1,0 +1,301 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | ICS26 router and ICS02 client registry, mirroring `ICS26Router.sol`.
+--
+-- Canton has no shared key-value store and no event log, so:
+--
+--   * commitments and acknowledgements are contracts ('PacketCommitment', 'PacketAck') whose
+--     creation doubles as the `SendPacket` / `WriteAcknowledgement` event;
+--   * per-client state lives in one 'Client' contract that is consumed and recreated on every
+--     send and receive, which is what makes sequences and receipts unique;
+--   * callers pass the ids of the contracts a choice touches.
+module IBC.Router where
+
+import DA.Crypto.Text (BytesHex)
+import DA.Date (Month(Jan), date)
+import DA.Map (Map)
+import DA.Map qualified as Map
+import DA.Set (Set)
+import DA.Set qualified as Set
+import DA.Time (convertRelTimeToMicroseconds, subTime, time)
+import IBC.App
+import IBC.ICS24
+import IBC.LightClient
+import IBC.Types
+
+-- | Maximum timeout duration, in seconds.
+maxTimeoutDuration : Int
+maxTimeoutDuration = 86400
+
+-- | Ledger time in unix seconds.
+getUnixTime : Update Int
+getUnixTime = do
+  now <- getTime
+  pure (convertRelTimeToMicroseconds (subTime now (time (date 1970 Jan 1) 0 0 0)) / 1000000)
+
+data Port = Port
+  with
+    owner : Party
+      -- ^ The only party allowed to send packets from this port.
+    app : ContractId IBCApp
+  deriving (Eq, Show)
+
+template Client
+  with
+    operator : Party
+    observers : [Party]
+    clientId : Text
+    counterpartyClientId : Text
+    merklePrefix : [BytesHex]
+    lightClient : ContractId LightClient
+    nextSequenceSend : Int
+    receipts : Set Int
+  where
+    signatory operator
+    observer observers
+
+template PacketCommitment
+  with
+    operator : Party
+    observers : [Party]
+    packet : Packet
+    commitment : BytesHex
+  where
+    signatory operator
+    observer observers
+
+template PacketAck
+  with
+    operator : Party
+    observers : [Party]
+    packet : Packet
+    acknowledgements : [BytesHex]
+    commitment : BytesHex
+  where
+    signatory operator
+    observer observers
+
+template Router
+  with
+    operator : Party
+    relayers : [Party]
+    ports : Map Text Port
+  where
+    signatory operator
+    observer routerStakeholders this
+
+    choice Router_AddApp : ContractId Router
+      with
+        portId : Text
+        port : Port
+      controller operator
+      do
+        assertMsg "port already bound" (not (Map.member portId ports))
+        create this with ports = Map.insert portId port ports
+
+    nonconsuming choice Router_AddClient : ContractId Client
+      with
+        clientId : Text
+        counterpartyClientId : Text
+        merklePrefix : [BytesHex]
+        lightClient : ContractId LightClient
+      controller operator
+      do
+        create Client with
+          operator
+          observers = routerStakeholders this
+          clientId
+          counterpartyClientId
+          merklePrefix
+          lightClient
+          nextSequenceSend = 1
+          receipts = Set.empty
+
+    nonconsuming choice Router_UpdateClient : ContractId Client
+      with
+        relayer : Party
+        clientCid : ContractId Client
+        updateMsg : BytesHex
+      controller relayer
+      do
+        assertMsg "unknown relayer" (relayer `elem` relayers)
+        client <- fetchClient this clientCid
+        lightClient <- exercise client.lightClient LightClient_UpdateClient with updateMsg
+        if lightClient == client.lightClient
+          then pure clientCid
+          else do
+            archive clientCid
+            create client with lightClient
+
+    -- | Returns the packet sequence and the new 'Client' contract.
+    nonconsuming choice Router_SendPacket : (Int, ContractId Client)
+      with
+        sender : Party
+        clientCid : ContractId Client
+        timeoutTimestamp : Int
+        payload : Payload
+      controller sender
+      do
+        assertMsg "unauthorized sender" (fmap (.owner) (Map.lookup payload.sourcePort ports) == Some sender)
+        now <- getUnixTime
+        assertMsg "invalid timeout timestamp" (timeoutTimestamp > now)
+        assertMsg "invalid timeout duration" (timeoutTimestamp - now <= maxTimeoutDuration)
+
+        client <- fetchClient this clientCid
+        let packet = Packet with
+              sequence = client.nextSequenceSend
+              sourceClient = client.clientId
+              destClient = client.counterpartyClientId
+              timeoutTimestamp
+              payloads = [payload]
+        archive clientCid
+        newClientCid <- create client with nextSequenceSend = client.nextSequenceSend + 1
+        create PacketCommitment with
+          operator
+          observers = routerStakeholders this
+          packet
+          commitment = packetCommitment packet
+        pure (packet.sequence, newClientCid)
+
+    -- | Returns `None` if the packet was already received.
+    nonconsuming choice Router_RecvPacket : Optional (ContractId PacketAck)
+      with
+        relayer : Party
+        clientCid : ContractId Client
+        packet : Packet
+        proofCommitment : BytesHex
+        proofHeight : Int
+        context : [ContractId AppContext]
+      controller relayer
+      do
+        assertMsg "unknown relayer" (relayer `elem` relayers)
+        payload <- singlePayload packet
+        client <- fetchClient this clientCid
+        assertMsg "invalid dest client" (client.clientId == packet.destClient)
+        assertMsg "invalid counterparty" (client.counterpartyClientId == packet.sourceClient)
+        now <- getUnixTime
+        assertMsg "invalid timeout timestamp" (packet.timeoutTimestamp > now)
+
+        exercise client.lightClient LightClient_VerifyMembership with
+          proof = proofCommitment
+          proofHeight
+          path = prefixedPath client.merklePrefix (packetCommitmentPath packet.sourceClient packet.sequence)
+          value = packetCommitment packet
+
+        if Set.member packet.sequence client.receipts
+          then pure None
+          else do
+            archive clientCid
+            create client with receipts = Set.insert packet.sequence client.receipts
+
+            port <- portOf this payload.destPort
+            ack <- exercise port.app IBCApp_OnRecvPacket with
+              callback = callbackFor packet payload relayer
+              context
+            assertMsg "async acknowledgement not supported" (ack /= "")
+            assertMsg "app returned the universal error acknowledgement" (ack /= universalErrorAck)
+
+            Some <$> create PacketAck with
+              operator
+              observers = routerStakeholders this
+              packet
+              acknowledgements = [ack]
+              commitment = packetAcknowledgementCommitment [ack]
+
+    nonconsuming choice Router_AckPacket : ()
+      with
+        relayer : Party
+        clientCid : ContractId Client
+        commitmentCid : ContractId PacketCommitment
+        packet : Packet
+        acknowledgement : BytesHex
+        proofAcked : BytesHex
+        proofHeight : Int
+      controller relayer
+      do
+        assertMsg "unknown relayer" (relayer `elem` relayers)
+        payload <- singlePayload packet
+        client <- fetchClient this clientCid
+        assertMsg "invalid source client" (client.clientId == packet.sourceClient)
+        assertMsg "invalid counterparty" (client.counterpartyClientId == packet.destClient)
+
+        exercise client.lightClient LightClient_VerifyMembership with
+          proof = proofAcked
+          proofHeight
+          path =
+            prefixedPath client.merklePrefix
+              (packetAcknowledgementCommitmentPath packet.destClient packet.sequence)
+          value = packetAcknowledgementCommitment [acknowledgement]
+
+        deleteCommitment this commitmentCid packet
+        port <- portOf this payload.sourcePort
+        exercise port.app IBCApp_OnAcknowledgementPacket with
+          callback = callbackFor packet payload relayer
+          acknowledgement
+
+    nonconsuming choice Router_TimeoutPacket : ()
+      with
+        relayer : Party
+        clientCid : ContractId Client
+        commitmentCid : ContractId PacketCommitment
+        packet : Packet
+        proofTimeout : BytesHex
+        proofHeight : Int
+      controller relayer
+      do
+        assertMsg "unknown relayer" (relayer `elem` relayers)
+        payload <- singlePayload packet
+        client <- fetchClient this clientCid
+        assertMsg "invalid source client" (client.clientId == packet.sourceClient)
+        assertMsg "invalid counterparty" (client.counterpartyClientId == packet.destClient)
+
+        counterpartyTimestamp <- exercise client.lightClient LightClient_VerifyNonMembership with
+          proof = proofTimeout
+          proofHeight
+          path =
+            prefixedPath client.merklePrefix
+              (packetReceiptCommitmentPath packet.destClient packet.sequence)
+        assertMsg "invalid timeout timestamp" (counterpartyTimestamp >= packet.timeoutTimestamp)
+
+        deleteCommitment this commitmentCid packet
+        port <- portOf this payload.sourcePort
+        exercise port.app IBCApp_OnTimeoutPacket with
+          callback = callbackFor packet payload relayer
+
+routerStakeholders : Router -> [Party]
+routerStakeholders router = router.relayers <> map (.owner) (Map.values router.ports)
+
+fetchClient : Router -> ContractId Client -> Update Client
+fetchClient router clientCid = do
+  client <- fetch clientCid
+  assertMsg "client of another router" (client.operator == router.operator)
+  pure client
+
+portOf : Router -> Text -> Update Port
+portOf router portId = case Map.lookup portId router.ports of
+  Some port -> pure port
+  None -> abort ("no app on port " <> portId)
+
+singlePayload : Packet -> Update Payload
+singlePayload packet = case packet.payloads of
+  [payload] -> pure payload
+  _ -> abort "multi-payload packets not supported"
+
+-- | Archive the commitment of `packet`, which must have been sent through `router`.
+deleteCommitment : Router -> ContractId PacketCommitment -> Packet -> Update ()
+deleteCommitment router commitmentCid packet = do
+  stored <- fetch commitmentCid
+  assertMsg "commitment of another router" (stored.operator == router.operator)
+  assertMsg "packet commitment mismatch"
+    (stored.packet.sourceClient == packet.sourceClient
+      && stored.packet.sequence == packet.sequence
+      && stored.commitment == packetCommitment packet)
+  archive commitmentCid
+
+callbackFor : Packet -> Payload -> Party -> PacketCallback
+callbackFor packet payload relayer = PacketCallback with
+  sourceClient = packet.sourceClient
+  destinationClient = packet.destClient
+  sequence = packet.sequence
+  payload
+  relayer

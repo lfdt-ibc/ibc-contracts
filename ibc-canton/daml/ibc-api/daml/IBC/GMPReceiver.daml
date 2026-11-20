@@ -1,0 +1,32 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | The interface a contract implements to be callable through ICS27 GMP.
+module IBC.GMPReceiver where
+
+import DA.Crypto.Text (BytesHex)
+
+-- | The caller of an inbound call: `(local client id, sender on the counterparty, salt)`.
+data AccountIdentifier = AccountIdentifier
+  with
+    clientId : Text
+    sender : Text
+    salt : BytesHex
+  deriving (Eq, Show)
+
+data GMPReceiverView = GMPReceiverView
+  with
+    gmp : Party
+      -- ^ The GMP party this receiver accepts calls from.
+
+interface GMPReceiver where
+  viewtype GMPReceiverView
+
+  execute : ContractId GMPReceiver -> AccountIdentifier -> BytesHex -> Update BytesHex
+
+  -- | Returns the call result, which becomes the packet acknowledgement.
+  nonconsuming choice GMPReceiver_Execute : BytesHex
+    with
+      account : AccountIdentifier
+      payload : BytesHex
+    controller (view this).gmp
+    do execute this self account payload

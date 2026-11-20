@@ -1,0 +1,23 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | A light client that accepts every proof. Mirrors `DummyLightClient.sol`; for tests only.
+module IBC.MockLightClient where
+
+import IBC.LightClient
+
+template MockLightClient
+  with
+    operator : Party
+    observers : [Party]
+      -- ^ Relayers, who must see the client to relay through it.
+    timestamp : Int
+      -- ^ The counterparty timestamp, in unix seconds, reported for every proof.
+  where
+    signatory operator
+    observer observers
+
+    interface instance LightClient for MockLightClient where
+      view = LightClientView with operator
+      updateClient self _ = pure self
+      verifyMembership _ _ _ _ = pure timestamp
+      verifyNonMembership _ _ _ = pure timestamp

@@ -1,0 +1,44 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Light client interface, mirroring `ILightClient.sol`.
+module IBC.LightClient where
+
+import DA.Crypto.Text (BytesHex)
+
+data LightClientView = LightClientView
+  with
+    operator : Party
+      -- ^ The router operator, the only party allowed to call the client.
+
+interface LightClient where
+  viewtype LightClientView
+
+  updateClient : ContractId LightClient -> BytesHex -> Update (ContractId LightClient)
+  verifyMembership : BytesHex -> Int -> [BytesHex] -> BytesHex -> Update Int
+  verifyNonMembership : BytesHex -> Int -> [BytesHex] -> Update Int
+
+  -- | Returns the contract id of the updated client, which may be `self`.
+  nonconsuming choice LightClient_UpdateClient : ContractId LightClient
+    with
+      updateMsg : BytesHex
+    controller (view this).operator
+    do updateClient this self updateMsg
+
+  -- | Returns the counterparty timestamp, in unix seconds, at `proofHeight`.
+  nonconsuming choice LightClient_VerifyMembership : Int
+    with
+      proof : BytesHex
+      proofHeight : Int
+      path : [BytesHex]
+      value : BytesHex
+    controller (view this).operator
+    do verifyMembership this proof proofHeight path value
+
+  -- | Returns the counterparty timestamp, in unix seconds, at `proofHeight`.
+  nonconsuming choice LightClient_VerifyNonMembership : Int
+    with
+      proof : BytesHex
+      proofHeight : Int
+      path : [BytesHex]
+    controller (view this).operator
+    do verifyNonMembership this proof proofHeight path

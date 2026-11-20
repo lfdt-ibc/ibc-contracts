@@ -1,0 +1,25 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+module Test.Counter where
+
+import IBC.GMPReceiver
+import IBC.Hex
+
+-- | A GMP receiver that adds the 32-byte big-endian payload to a counter and returns the total.
+template Counter
+  with
+    owner : Party
+    gmp : Party
+    count : Int
+    lastCaller : Optional AccountIdentifier
+  where
+    signatory owner
+    observer gmp
+
+    interface instance GMPReceiver for Counter where
+      view = GMPReceiverView with gmp
+      execute self account payload = do
+        archive self
+        let total = count + toUint payload
+        create this with count = total, lastCaller = Some account
+        pure (uintBE 32 total)

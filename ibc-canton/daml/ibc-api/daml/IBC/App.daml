@@ -1,0 +1,57 @@
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | IBC application interface, mirroring `IIBCApp.sol`.
+module IBC.App where
+
+import DA.Crypto.Text (BytesHex)
+import IBC.Types
+
+-- | Marker for contracts a relayer passes along with a packet. Daml cannot turn packet bytes
+-- into a contract id, so apps that need to reach other contracts get their ids from the relayer
+-- and must authenticate them against the packet themselves.
+data AppContextView = AppContextView {}
+
+interface AppContext where
+  viewtype AppContextView
+
+data PacketCallback = PacketCallback
+  with
+    sourceClient : Text
+    destinationClient : Text
+    sequence : Int
+    payload : Payload
+    relayer : Party
+  deriving (Eq, Show)
+
+data AppView = AppView
+  with
+    operator : Party
+      -- ^ The router operator, the only party allowed to call the app back.
+
+interface IBCApp where
+  viewtype AppView
+
+  onRecvPacket : PacketCallback -> [ContractId AppContext] -> Update BytesHex
+  onAcknowledgementPacket : PacketCallback -> BytesHex -> Update ()
+  onTimeoutPacket : PacketCallback -> Update ()
+
+  -- | Returns the acknowledgement. A failure aborts the whole receive, there is no error ack.
+  nonconsuming choice IBCApp_OnRecvPacket : BytesHex
+    with
+      callback : PacketCallback
+      context : [ContractId AppContext]
+    controller (view this).operator
+    do onRecvPacket this callback context
+
+  nonconsuming choice IBCApp_OnAcknowledgementPacket : ()
+    with
+      callback : PacketCallback
+      acknowledgement : BytesHex
+    controller (view this).operator
+    do onAcknowledgementPacket this callback acknowledgement
+
+  nonconsuming choice IBCApp_OnTimeoutPacket : ()
+    with
+      callback : PacketCallback
+    controller (view this).operator
+    do onTimeoutPacket this callback
