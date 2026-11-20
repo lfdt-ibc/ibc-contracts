@@ -1,32 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     time::UNIX_EPOCH,
 };
 
 use alloy::{
     consensus::Header,
     network::Ethereum,
-    primitives::{hex, keccak256, Address, Bytes, Signature, B256, U256},
+    primitives::{hex, keccak256, Address, Bytes, B256},
     providers::{Provider, RootProvider},
-    rpc::types::{EIP1186AccountProofResponse, EIP1186StorageProof},
+    rpc::types::EIP1186AccountProofResponse,
     sol_types::{SolCall, SolValue},
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use ethereum_apis::eth_api::client::EthApiClient;
-use ethereum_light_client::membership::evm_ics26_commitment_path;
 use ibc_eureka_solidity_types::{
     besu::besu_light_client,
     ibc_multicall::multicall_calldata,
     ics26::{
         router::{routerCalls, routerInstance, updateClientCall},
         IICS02ClientMsgs::Height as RouterHeight,
-        ICS26_IBC_STORAGE_SLOT,
     },
     msgs::{IBesuLightClientMsgs, IICS02ClientMsgs::Height as MsgHeight},
 };
 use proof_api_lib::utils::{
+    eth_bft::{
+        attach_packet_proofs, map_storage_proofs, needs_update, packet_storage_key,
+        parse_create_client_params, retain_provable_packet_calls, sort_commit_seals,
+    },
     eth_eureka::{src_events_to_recv_and_ack_msgs, target_events_to_timeout_msgs},
     RelayEventsParams,
 };
@@ -41,18 +43,6 @@ pub struct TxBuilder {
     dst_ics26_router: routerInstance<RootProvider, Ethereum>,
     consensus_type: BesuConsensusType,
 }
-
-struct CreateClientParams {
-    trusting_period: u64,
-    max_clock_drift: u64,
-    trust_level: IBesuLightClientMsgs::TrustThreshold,
-    trusted_height: Option<u64>,
-}
-
-const TRUSTING_PERIOD: &str = "trusting_period";
-const MAX_CLOCK_DRIFT: &str = "max_clock_drift";
-const TRUST_LEVEL: &str = "trust_level";
-const TRUSTED_HEIGHT: &str = "trusted_height";
 
 impl TxBuilder {
     pub fn new(
@@ -101,8 +91,8 @@ impl TxBuilder {
                 maxClockDrift: params.max_clock_drift,
                 isFrozen: false,
                 trustLevel: besu_light_client::IBesuLightClientMsgs::TrustThreshold {
-                    numerator: params.trust_level.numerator,
-                    denominator: params.trust_level.denominator,
+                    numerator: params.trust_level.0,
+                    denominator: params.trust_level.1,
                 },
             },
             besu_light_client::IBesuLightClientMsgs::ConsensusState {
@@ -225,11 +215,14 @@ impl TxBuilder {
         if packet_calls.is_empty() {
             bail!("all packets have already been completed on the source chain at height {proof_height}")
         }
+        let proven_state = consensus_state(&header)?;
         attach_packet_proofs(
             &mut packet_calls,
             &proof.account_proof,
             &storage_proofs,
-            &consensus_state(&header)?,
+            |account_proof_nodes, proof_nodes| {
+                membership_proof(&proven_state, account_proof_nodes, proof_nodes)
+            },
         )?;
 
         let update_call = self
@@ -363,17 +356,19 @@ impl TxBuilder {
     }
 }
 
-/// Whether the destination client must be updated before proving at `proof_height`.
-///
-/// The light client requires an update header strictly above its trusted height, so an update is
-/// only built once the source has advanced past it. At equal heights the client already stores
-/// the consensus state proofs are verified against.
-fn needs_update(trusted_height: u64, proof_height: u64) -> Result<bool> {
-    ensure!(
-        proof_height >= trusted_height,
-        "destination client trusts height {trusted_height}, ahead of the latest source block {proof_height}; retry once the source node catches up"
-    );
-    Ok(proof_height > trusted_height)
+/// Encodes the membership proof of a packet call against the consensus state it is verified with.
+fn membership_proof(
+    proven_state: &IBesuLightClientMsgs::ConsensusState,
+    account_proof_nodes: Vec<Bytes>,
+    proof_nodes: Vec<Bytes>,
+) -> Bytes {
+    IBesuLightClientMsgs::MembershipProof {
+        consensusStatePreimage: proven_state.clone(),
+        accountProofNodes: account_proof_nodes,
+        proofNodes: proof_nodes,
+    }
+    .abi_encode()
+    .into()
 }
 
 /// Rebuilds the consensus state the light client derives from a source header.
@@ -391,222 +386,6 @@ fn consensus_state(header: &Header) -> Result<IBesuLightClientMsgs::ConsensusSta
                 header.number
             )
         })?,
-    })
-}
-
-fn packet_storage_key(call: &routerCalls) -> B256 {
-    let path = match call {
-        routerCalls::recvPacket(call) => call.msg_.packet.commitment_path(),
-        routerCalls::ackPacket(call) => call.msg_.packet.ack_commitment_path(),
-        routerCalls::timeoutPacket(call) => call.msg_.packet.receipt_commitment_path(),
-        _ => unreachable!("only recv, ack, and timeout calls are constructed"),
-    };
-    evm_ics26_commitment_path(&path, U256::from_be_slice(&ICS26_IBC_STORAGE_SLOT)).into()
-}
-
-/// The `eth_getProof` result for a single storage slot of the source router.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct StorageSlotProof {
-    /// The slot value at the proven height, zero when the slot is empty.
-    value: U256,
-    /// Ordered, RLP-encoded MPT nodes from the router account storage trie.
-    nodes: Vec<Bytes>,
-}
-
-/// Drops packet calls whose proof can no longer be verified against the proven source state.
-///
-/// Proofs are fetched at the latest source block, so a packet completed on the source chain after
-/// its event was emitted yields a proof of the opposite kind from what the router call needs.
-/// `ICS26Router` verifies the proof before its no-op checks, so such a call would revert the whole
-/// multicall instead of no-op'ing. Each dropped call is logged.
-fn retain_provable_packet_calls(
-    packet_calls: &mut Vec<routerCalls>,
-    storage_proofs: &HashMap<B256, StorageSlotProof>,
-) -> Result<()> {
-    let mut error = None;
-    packet_calls.retain(|call| {
-        let storage_key = packet_storage_key(call);
-        let Some(slot) = storage_proofs.get(&storage_key) else {
-            error.get_or_insert_with(|| anyhow!("missing storage proof for key {storage_key}"));
-            return false;
-        };
-        let slot_is_set = !slot.value.is_zero();
-        let (kind, packet, reason) = match call {
-            routerCalls::recvPacket(call) if !slot_is_set => (
-                "recvPacket",
-                &call.msg_.packet,
-                "packet commitment is absent from the source router; the packet was already acknowledged or timed out",
-            ),
-            routerCalls::ackPacket(call) if !slot_is_set => (
-                "ackPacket",
-                &call.msg_.packet,
-                "acknowledgement commitment is absent from the source router",
-            ),
-            routerCalls::timeoutPacket(call) if slot_is_set => (
-                "timeoutPacket",
-                &call.msg_.packet,
-                "packet receipt exists on the source router; the packet was received before it could time out",
-            ),
-            routerCalls::recvPacket(_) | routerCalls::ackPacket(_) | routerCalls::timeoutPacket(_) => {
-                return true;
-            }
-            _ => unreachable!("only recv, ack, and timeout calls are constructed"),
-        };
-        tracing::warn!(
-            kind,
-            source_client = %packet.sourceClient,
-            dest_client = %packet.destClient,
-            sequence = packet.sequence,
-            "skipping packet call: {reason}"
-        );
-        false
-    });
-    error.map_or(Ok(()), Err)
-}
-
-/// Attaches an `IBesuLightClientMsgs::MembershipProof` to every packet call, pairing the storage
-/// proof nodes for the packet's commitment slot with the consensus state they are verified against.
-///
-/// The router account proof is only attached to the first call. All calls share the same proof
-/// height and execute in a single multicall, so the light client verifies the account proof once,
-/// caches the storage root in transient storage, and serves the remaining calls from that cache
-/// when their `accountProofNodes` are empty. The first call is not allowed to fail, so the cache is
-/// always set before the remaining calls run.
-fn attach_packet_proofs(
-    packet_calls: &mut [routerCalls],
-    account_proof: &[Bytes],
-    storage_proofs: &HashMap<B256, StorageSlotProof>,
-    proven_state: &IBesuLightClientMsgs::ConsensusState,
-) -> Result<()> {
-    let mut account_proof = Some(account_proof);
-    packet_calls.iter_mut().try_for_each(|call| {
-        let storage_key = packet_storage_key(call);
-        let proof_nodes = &storage_proofs
-            .get(&storage_key)
-            .ok_or_else(|| anyhow!("missing storage proof for key {storage_key}"))?
-            .nodes;
-        let proof: Bytes = IBesuLightClientMsgs::MembershipProof {
-            consensusStatePreimage: proven_state.clone(),
-            accountProofNodes: account_proof.take().map_or_default(<[Bytes]>::to_vec),
-            proofNodes: proof_nodes.clone(),
-        }
-        .abi_encode()
-        .into();
-
-        match call {
-            routerCalls::recvPacket(call) => call.msg_.proofCommitment = proof,
-            routerCalls::ackPacket(call) => call.msg_.proofAcked = proof,
-            routerCalls::timeoutPacket(call) => call.msg_.proofTimeout = proof,
-            _ => unreachable!("only recv, ack, and timeout calls are constructed"),
-        }
-        Ok(())
-    })
-}
-
-/// Indexes storage slot proofs by slot key, requiring exactly one proof per expected key.
-fn map_storage_proofs(
-    expected_keys: &[B256],
-    storage_proofs: &[EIP1186StorageProof],
-) -> Result<HashMap<B256, StorageSlotProof>> {
-    let expected_keys = expected_keys.iter().copied().collect::<HashSet<_>>();
-    let proofs = storage_proofs.iter().try_fold(
-        HashMap::with_capacity(expected_keys.len()),
-        |mut proofs, storage_proof| {
-            let key = storage_proof.key.as_b256();
-            ensure!(
-                expected_keys.contains(&key),
-                "unexpected storage proof key {key}"
-            );
-            let slot = StorageSlotProof {
-                value: storage_proof.value,
-                nodes: storage_proof.proof.clone(),
-            };
-            ensure!(
-                proofs.insert(key, slot).is_none(),
-                "duplicate storage proof key {key}"
-            );
-            Ok(proofs)
-        },
-    )?;
-
-    if let Some(key) = expected_keys.iter().find(|key| !proofs.contains_key(*key)) {
-        bail!("missing storage proof for key {key}");
-    }
-    Ok(proofs)
-}
-
-fn parse_create_client_params(parameters: &HashMap<String, String>) -> Result<CreateClientParams> {
-    parameters
-        .keys()
-        .find(|key| {
-            ![
-                TRUSTING_PERIOD,
-                MAX_CLOCK_DRIFT,
-                TRUST_LEVEL,
-                TRUSTED_HEIGHT,
-            ]
-            .contains(&key.as_str())
-        })
-        .map_or(Ok(()), |key| {
-            Err(anyhow!(
-                "unexpected parameter `{key}`, only `{TRUSTING_PERIOD}`, `{MAX_CLOCK_DRIFT}`, `{TRUST_LEVEL}`, and `{TRUSTED_HEIGHT}` are allowed"
-            ))
-        })?;
-
-    Ok(CreateClientParams {
-        trusting_period: parameters
-            .get(TRUSTING_PERIOD)
-            .ok_or_else(|| anyhow!("missing `{TRUSTING_PERIOD}` parameter"))?
-            .parse()
-            .with_context(|| format!("failed to parse `{TRUSTING_PERIOD}` as decimal seconds"))?,
-        max_clock_drift: parameters
-            .get(MAX_CLOCK_DRIFT)
-            .ok_or_else(|| anyhow!("missing `{MAX_CLOCK_DRIFT}` parameter"))?
-            .parse()
-            .with_context(|| format!("failed to parse `{MAX_CLOCK_DRIFT}` as decimal seconds"))?,
-        trust_level: parameters
-            .get(TRUST_LEVEL)
-            .map_or(Ok(DEFAULT_TRUST_LEVEL), |value| parse_trust_level(value))?,
-        trusted_height: parameters
-            .get(TRUSTED_HEIGHT)
-            .map(|value| {
-                value.parse().with_context(|| {
-                    format!("failed to parse `{TRUSTED_HEIGHT}` as decimal block height")
-                })
-            })
-            .transpose()?,
-    })
-}
-
-/// Default trust level, matching the `ceil(2n / 3)` commit-seal quorum.
-const DEFAULT_TRUST_LEVEL: IBesuLightClientMsgs::TrustThreshold =
-    IBesuLightClientMsgs::TrustThreshold {
-        numerator: 2,
-        denominator: 3,
-    };
-
-/// Parses a `<numerator>/<denominator>` trust level and checks that it is within `[1/3, 2/3]`.
-fn parse_trust_level(value: &str) -> Result<IBesuLightClientMsgs::TrustThreshold> {
-    let (numerator, denominator) = value
-        .split_once('/')
-        .and_then(|(numerator, denominator)| {
-            Some((
-                numerator.trim().parse::<u8>().ok()?,
-                denominator.trim().parse::<u8>().ok()?,
-            ))
-        })
-        .with_context(|| {
-            format!("failed to parse `{TRUST_LEVEL}` as `<numerator>/<denominator>`: {value}")
-        })?;
-    ensure!(
-        denominator != 0
-            && 3 * u16::from(numerator) >= u16::from(denominator)
-            && 3 * u16::from(numerator) <= 2 * u16::from(denominator),
-        "`{TRUST_LEVEL}` must be within [1/3, 2/3], got {numerator}/{denominator}"
-    );
-    Ok(IBesuLightClientMsgs::TrustThreshold {
-        numerator,
-        denominator,
     })
 }
 
@@ -673,344 +452,21 @@ fn split_commit_seals(
     let header_rlp = Bytes::from(alloy_rlp::encode(&signing_header));
     let digest = keccak256(&header_rlp);
 
-    let mut signed_seals = seals
-        .into_iter()
-        .map(|seal| {
-            let signature =
-                Signature::from_raw(&seal).context("failed to decode commit seal signature")?;
-            let signer = signature
-                .recover_address_from_prehash(&digest)
-                .context("failed to recover commit seal signer")?;
-            // `as_bytes` encodes the recovery id as 27/28, whichever form Besu used.
-            Ok((signer, Bytes::from(signature.as_bytes())))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    signed_seals.sort_by_key(|(signer, _)| *signer);
-    if let Some(pair) = signed_seals.windows(2).find(|pair| pair[0].0 == pair[1].0) {
-        bail!("duplicate commit seal signer {}", pair[0].0);
-    }
+    let commit_seals = sort_commit_seals(&digest, seals)?;
 
-    Ok((
-        header_rlp,
-        signed_seals.into_iter().map(|(_, seal)| seal).collect(),
-    ))
+    Ok((header_rlp, commit_seals))
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use super::{
-        attach_packet_proofs, map_storage_proofs, needs_update, packet_storage_key,
-        parse_create_client_params, retain_provable_packet_calls, split_commit_seals,
-        StorageSlotProof, TRUST_LEVEL,
-    };
+    use super::split_commit_seals;
     use crate::BesuConsensusType;
     use alloy::{
         consensus::Header,
-        primitives::{keccak256, Address, Bytes, Signature, B256, U256},
-        rpc::types::EIP1186StorageProof,
+        primitives::{keccak256, Address, Bytes, Signature, B256},
         signers::{local::PrivateKeySigner, SignerSync},
-        sol_types::SolValue,
-    };
-    use ibc_eureka_solidity_types::{
-        ics26::{
-            router::{ackPacketCall, recvPacketCall, routerCalls, timeoutPacketCall},
-            IICS02ClientMsgs::Height,
-            IICS26RouterMsgs::{MsgAckPacket, MsgRecvPacket, MsgTimeoutPacket, Packet},
-        },
-        msgs::IBesuLightClientMsgs,
     };
     use rlp::{Rlp, RlpStream};
-
-    fn packet(sequence: u64) -> Packet {
-        Packet {
-            sequence,
-            sourceClient: "client-0".to_string(),
-            destClient: "client-1".to_string(),
-            timeoutTimestamp: 0,
-            payloads: vec![],
-        }
-    }
-
-    fn proof_height() -> Height {
-        Height {
-            revisionNumber: 0,
-            revisionHeight: 1,
-        }
-    }
-
-    fn recv_packet_call(sequence: u64) -> routerCalls {
-        routerCalls::recvPacket(recvPacketCall {
-            msg_: MsgRecvPacket {
-                packet: packet(sequence),
-                proofHeight: proof_height(),
-                proofCommitment: Bytes::default(),
-            },
-        })
-    }
-
-    fn ack_packet_call(sequence: u64) -> routerCalls {
-        routerCalls::ackPacket(ackPacketCall {
-            msg_: MsgAckPacket {
-                packet: packet(sequence),
-                acknowledgement: Bytes::from(vec![0x01]),
-                proofAcked: Bytes::default(),
-                proofHeight: proof_height(),
-            },
-        })
-    }
-
-    fn timeout_packet_call(sequence: u64) -> routerCalls {
-        routerCalls::timeoutPacket(timeoutPacketCall {
-            msg_: MsgTimeoutPacket {
-                packet: packet(sequence),
-                proofTimeout: Bytes::default(),
-                proofHeight: proof_height(),
-            },
-        })
-    }
-
-    fn sequence_of(call: &routerCalls) -> u64 {
-        match call {
-            routerCalls::recvPacket(call) => call.msg_.packet.sequence,
-            routerCalls::ackPacket(call) => call.msg_.packet.sequence,
-            routerCalls::timeoutPacket(call) => call.msg_.packet.sequence,
-            _ => unreachable!("only recv, ack, and timeout calls are constructed"),
-        }
-    }
-
-    fn decode_recv_proof(call: &routerCalls) -> IBesuLightClientMsgs::MembershipProof {
-        let routerCalls::recvPacket(call) = call else {
-            unreachable!("call kind is preserved");
-        };
-        IBesuLightClientMsgs::MembershipProof::abi_decode(&call.msg_.proofCommitment)
-            .expect("proof decodes as MembershipProof")
-    }
-
-    fn proven_state() -> IBesuLightClientMsgs::ConsensusState {
-        IBesuLightClientMsgs::ConsensusState {
-            timestamp: 7,
-            stateRoot: B256::repeat_byte(0xaa),
-            validators: vec![Address::repeat_byte(0x11)],
-        }
-    }
-
-    /// Builds one slot proof per call with a distinct single node, using `value` to pick the
-    /// proven slot value from the call's index.
-    fn slot_proofs(
-        calls: &[routerCalls],
-        value: impl Fn(usize) -> U256,
-    ) -> HashMap<B256, StorageSlotProof> {
-        calls
-            .iter()
-            .enumerate()
-            .map(|(i, call)| {
-                let slot = StorageSlotProof {
-                    value: value(i),
-                    nodes: vec![Bytes::from(vec![0xc1, u8::try_from(i).unwrap()])],
-                };
-                (packet_storage_key(call), slot)
-            })
-            .collect()
-    }
-
-    const SET: U256 = U256::from_limbs([1, 0, 0, 0]);
-
-    #[test]
-    fn maps_storage_proof_values_and_nodes_by_key() {
-        let key = B256::from(U256::from(1));
-        let nodes = vec![Bytes::from(vec![0xc2, 0x01, 0x02])];
-        let mapped = map_storage_proofs(
-            &[key],
-            &[EIP1186StorageProof {
-                key: U256::from(1).into(),
-                value: U256::from(42),
-                proof: nodes.clone(),
-            }],
-        )
-        .unwrap();
-
-        assert_eq!(
-            mapped[&key],
-            StorageSlotProof {
-                value: U256::from(42),
-                nodes,
-            }
-        );
-    }
-
-    #[test]
-    fn rejects_missing_duplicate_and_unexpected_storage_proofs() {
-        let key = B256::from(U256::from(1));
-        let proof = |key: U256| EIP1186StorageProof {
-            key: key.into(),
-            value: U256::ZERO,
-            proof: vec![],
-        };
-
-        assert!(map_storage_proofs(&[key], &[]).is_err());
-        assert!(map_storage_proofs(&[key], &[proof(U256::from(1)), proof(U256::from(1))]).is_err());
-        assert!(map_storage_proofs(&[key], &[proof(U256::from(2))]).is_err());
-    }
-
-    #[test]
-    fn retains_recv_and_ack_calls_only_while_their_commitment_exists() {
-        let mut calls = vec![
-            recv_packet_call(1),
-            recv_packet_call(2),
-            ack_packet_call(3),
-            ack_packet_call(4),
-        ];
-        // Sequences 2 and 4 have been cleared on the source chain.
-        let storage_proofs = slot_proofs(&calls, |i| if i % 2 == 0 { SET } else { U256::ZERO });
-
-        retain_provable_packet_calls(&mut calls, &storage_proofs).unwrap();
-
-        assert_eq!(
-            calls.iter().map(sequence_of).collect::<Vec<_>>(),
-            vec![1, 3]
-        );
-        assert!(matches!(calls[0], routerCalls::recvPacket(_)));
-        assert!(matches!(calls[1], routerCalls::ackPacket(_)));
-    }
-
-    #[test]
-    fn retains_timeout_calls_only_while_no_receipt_exists() {
-        let mut calls = vec![timeout_packet_call(1), timeout_packet_call(2)];
-        // Sequence 1 was received on the source chain, so it can no longer time out.
-        let storage_proofs = slot_proofs(&calls, |i| if i == 0 { SET } else { U256::ZERO });
-
-        retain_provable_packet_calls(&mut calls, &storage_proofs).unwrap();
-
-        assert_eq!(calls.iter().map(sequence_of).collect::<Vec<_>>(), vec![2]);
-    }
-
-    #[test]
-    fn retain_rejects_missing_storage_proof() {
-        let mut calls = vec![recv_packet_call(1)];
-        assert!(retain_provable_packet_calls(&mut calls, &HashMap::default()).is_err());
-    }
-
-    #[test]
-    fn attaches_membership_proofs_with_consensus_state_preimage() {
-        let mut calls = vec![recv_packet_call(1)];
-        let storage_key = packet_storage_key(&calls[0]);
-        let nodes = vec![Bytes::from(vec![0xc2, 0x01, 0x02])];
-        let account_nodes = vec![Bytes::from(vec![0xc3, 0x01, 0x02, 0x03])];
-        let proven_state = proven_state();
-
-        assert!(
-            attach_packet_proofs(
-                &mut calls,
-                &account_nodes,
-                &HashMap::default(),
-                &proven_state
-            )
-            .is_err(),
-            "missing storage proof must be rejected"
-        );
-
-        let storage_proofs = HashMap::from([(
-            storage_key,
-            StorageSlotProof {
-                value: SET,
-                nodes: nodes.clone(),
-            },
-        )]);
-        attach_packet_proofs(&mut calls, &account_nodes, &storage_proofs, &proven_state).unwrap();
-
-        let proof = decode_recv_proof(&calls[0]);
-        assert_eq!(
-            proof.consensusStatePreimage.abi_encode(),
-            proven_state.abi_encode()
-        );
-        assert_eq!(proof.accountProofNodes, account_nodes);
-        assert_eq!(proof.proofNodes, nodes);
-    }
-
-    #[test]
-    fn attaches_account_proof_only_to_first_call_in_batch() {
-        let mut calls = vec![
-            recv_packet_call(1),
-            recv_packet_call(2),
-            recv_packet_call(3),
-        ];
-        let account_nodes = vec![Bytes::from(vec![0xc3, 0x01, 0x02, 0x03])];
-        let proven_state = proven_state();
-        let storage_proofs = slot_proofs(&calls, |_| SET);
-
-        attach_packet_proofs(&mut calls, &account_nodes, &storage_proofs, &proven_state).unwrap();
-
-        for (i, call) in calls.iter().enumerate() {
-            let proof = decode_recv_proof(call);
-            let expected_account_nodes = if i == 0 { &account_nodes[..] } else { &[][..] };
-            assert_eq!(
-                proof.accountProofNodes, expected_account_nodes,
-                "only the first call should carry the account proof"
-            );
-            assert_eq!(
-                proof.proofNodes,
-                storage_proofs[&packet_storage_key(call)].nodes,
-                "every call carries its own storage proof"
-            );
-            assert_eq!(
-                proof.consensusStatePreimage.abi_encode(),
-                proven_state.abi_encode()
-            );
-        }
-    }
-
-    #[test]
-    fn account_proof_moves_to_first_surviving_call_after_filtering() {
-        let mut calls = vec![recv_packet_call(1), recv_packet_call(2)];
-        let account_nodes = vec![Bytes::from(vec![0xc3, 0x01, 0x02, 0x03])];
-        // The first packet was already completed on the source chain.
-        let storage_proofs = slot_proofs(&calls, |i| if i == 0 { U256::ZERO } else { SET });
-
-        retain_provable_packet_calls(&mut calls, &storage_proofs).unwrap();
-        attach_packet_proofs(&mut calls, &account_nodes, &storage_proofs, &proven_state()).unwrap();
-
-        assert_eq!(calls.iter().map(sequence_of).collect::<Vec<_>>(), vec![2]);
-        assert_eq!(
-            decode_recv_proof(&calls[0]).accountProofNodes,
-            account_nodes
-        );
-    }
-
-    #[test]
-    fn needs_update_only_when_source_is_ahead() {
-        assert!(needs_update(10, 11).unwrap());
-        assert!(!needs_update(10, 10).unwrap());
-        assert!(needs_update(10, 9).is_err());
-    }
-
-    #[test]
-    fn create_client_params_trust_level() {
-        let params = |trust_level: Option<&str>| {
-            let mut params = HashMap::from([
-                ("trusting_period".to_string(), "1000".to_string()),
-                ("max_clock_drift".to_string(), "10".to_string()),
-            ]);
-            if let Some(trust_level) = trust_level {
-                params.insert(TRUST_LEVEL.to_string(), trust_level.to_string());
-            }
-            parse_create_client_params(&params)
-                .map(|params| (params.trust_level.numerator, params.trust_level.denominator))
-        };
-
-        assert_eq!(params(None).unwrap(), (2, 3));
-        assert_eq!(params(Some("1/3")).unwrap(), (1, 3));
-        assert_eq!(params(Some("4/6")).unwrap(), (4, 6));
-        for invalid in [
-            "", "2", "2/", "a/3", "1/0", "0/0", "1/4", "3/4", "1/1", "4/3", "256/256",
-        ] {
-            assert!(
-                params(Some(invalid)).is_err(),
-                "{invalid} should be rejected"
-            );
-        }
-    }
 
     fn besu_extra_data(validators: &[Address], seals: Option<&[Vec<u8>]>) -> Bytes {
         let mut stream = RlpStream::new_list(4 + usize::from(seals.is_some()));

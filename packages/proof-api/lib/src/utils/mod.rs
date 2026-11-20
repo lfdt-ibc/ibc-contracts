@@ -68,6 +68,7 @@ pub mod tracing_layer;
 pub mod cosmos;
 pub mod cosmos_attested;
 pub mod eth_attested;
+pub mod eth_bft;
 pub mod eth_eureka;
 pub mod solana;
 pub mod solana_attested;
