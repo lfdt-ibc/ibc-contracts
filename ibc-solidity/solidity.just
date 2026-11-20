@@ -210,6 +210,9 @@ generate-abi: build-contracts
 	jq '.abi' out/IBesuLightClientEncoding.sol/IBesuLightClientEncoding.json > abi/IBesuLightClientEncoding.json
 	jq '.abi' out/IBesuLightClientErrors.sol/IBesuLightClientErrors.json > abi/IBesuLightClientErrors.json
 	jq -r '.bytecode.object' out/BesuLightClient.sol/BesuLightClient.json > tmp/abigen/BesuLightClient.bin
+	jq '.abi' out/LineaLightClient.sol/LineaLightClient.json > abi/LineaLightClient.json
+	jq '.abi' out/ILineaLightClientEncoding.sol/ILineaLightClientEncoding.json > abi/ILineaLightClientEncoding.json
+	jq -r '.bytecode.object' out/LineaLightClient.sol/LineaLightClient.json > tmp/abigen/LineaLightClient.bin
 	jq '.abi' out/IFTOwnable.sol/IFTOwnable.json > abi/IFTOwnable.json
 	jq -r '.bytecode.object' out/IFTOwnable.sol/IFTOwnable.json > tmp/abigen/IFTOwnable.bin
 	jq '.abi' out/IFTOwnable2Step.sol/IFTOwnable2Step.json > abi/IFTOwnable2Step.json
@@ -237,6 +240,8 @@ generate-abi: build-contracts
 	abigen --abi abi/BesuLightClient.json --bin tmp/abigen/BesuLightClient.bin --pkg besulightclient --type Contract --out ../packages/go-abigen/besulightclient/contract.go
 	abigen --v2 --abi abi/IBesuLightClientEncoding.json --pkg besumsgs --type Bindings --out ../packages/go-abigen/besumsgs/bindings.go
 	abigen --v2 --abi abi/IBesuLightClientErrors.json --pkg besuerrors --type Bindings --out ../packages/go-abigen/besuerrors/bindings.go
+	abigen --abi abi/LineaLightClient.json --bin tmp/abigen/LineaLightClient.bin --pkg linealightclient --type Contract --out ../packages/go-abigen/linealightclient/contract.go
+	abigen --v2 --abi abi/ILineaLightClientEncoding.json --pkg lineamsgs --type Bindings --out ../packages/go-abigen/lineamsgs/bindings.go
 	abigen --abi abi/IBCMulticall.json --bin tmp/abigen/IBCMulticall.bin --pkg ibcmulticall --type Contract --out ../packages/go-abigen/ibcmulticall/contract.go
 	abigen --abi abi/ERC1967Proxy.json --bin tmp/abigen/ERC1967Proxy.bin --pkg erc1967proxy --type Contract --out ../packages/go-abigen/erc1967proxy/contract.go
 	abigen --abi abi/EVMIFTSendCallConstructor.json --bin tmp/abigen/EVMIFTSendCallConstructor.bin --pkg evmiftsendcall --type Contract --out ../packages/go-abigen/evmiftsendcall/contract.go
@@ -245,6 +250,7 @@ generate-abi: build-contracts
 	jq -c '{abi, bytecode: {object: .bytecode.object}}' out/SP1ICS07Tendermint.sol/SP1ICS07Tendermint.json > abi/bytecode/SP1ICS07Tendermint.json
 	jq -c '{abi, bytecode: {object: .bytecode.object}}' out/AttestationLightClient.sol/AttestationLightClient.json > abi/bytecode/AttestationLightClient.json
 	jq -c '{abi, bytecode: {object: .bytecode.object}}' out/BesuLightClient.sol/BesuLightClient.json > abi/bytecode/BesuLightClient.json
+	jq -c '{abi, bytecode: {object: .bytecode.object}}' out/LineaLightClient.sol/LineaLightClient.json > abi/bytecode/LineaLightClient.json
 	rm -rf tmp/abigen
 
 # Clean up the foundry cache and out directories
