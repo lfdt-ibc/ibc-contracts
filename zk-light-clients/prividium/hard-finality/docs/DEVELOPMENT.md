@@ -50,9 +50,9 @@ and the guest. Do not rely on host-only checks for proof soundness.
 ```bash
 export PRIVIDIUM_SOURCE_PROFILE="$PWD/profiles/example.synthetic.json"
 cargo fmt --all -- --check
-cargo check --workspace --all-targets --locked --offline
-cargo test --workspace --locked --offline
-cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+cargo check --workspace --all-targets --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
 
 cd contracts
 forge fmt --check

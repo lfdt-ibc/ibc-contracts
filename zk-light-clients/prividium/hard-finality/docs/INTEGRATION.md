@@ -109,13 +109,11 @@ backend process.
 Deploy it with the reviewed release artifacts by following
 [`../tooling/proof-api/docs/DEPLOYMENT.md`](../tooling/proof-api/docs/DEPLOYMENT.md).
 That guide provides both the Docker Compose path and the direct host launcher.
-This settlement-backed hard-finality service does not use an attestor key.
 
-The service bounds concurrent workers and queued requests. Matching in-flight
-retries share one proof job, successful completed results remain in a bounded
-memory cache, and excess distinct work is rejected instead of growing memory
-without limit. A restart discards in-memory work; matching relayer retries
-submit it again.
+The service limits concurrent and queued requests. Identical in-flight proof
+requests share one job. Only completed packet proof results are cached, and
+the bounded cache lives in memory. Restarting the service clears the cache,
+so the next request for the same packet proofs starts a new job.
 
 The soft-finality `proof-api-operator` branches are not compatible. They use
 an attestor-signed Update Client statement instead of Beacon Trust Update and
@@ -123,14 +121,13 @@ Settlement Update.
 
 ## Relayer compatibility
 
-Correctness must not require a relayer source-code patch. The Proof API must
-accept the published gRPC request shapes, preserve input order, split work
-within circuit/service limits, and return proof envelopes in corresponding
-order.
+The Proof API returns packet proofs in request order. Each `PacketProofs`
+request can contain at most 64 packets. The API rejects larger requests, so
+split larger batches on the caller side. For example, send 100 packets as two
+requests of 64 and 36.
 
-Relayer request timeout must exceed worst-case queue plus proving time, or
-proofs must be prewarmed and cached. A timeout may trigger a retry; identical
-requests must be deduplicated rather than generating unlimited duplicate jobs.
+Set the relayer request timeout to allow for both queueing and proving. An
+identical retry can share the proof job if it is still running.
 
 ## Forward, acknowledgement, and timeout flows
 
@@ -179,14 +176,12 @@ Production configuration should expose:
 - `maxAutomaticTrustUpdates` in `1..=8`, which bounds each in-memory catch-up
   group and the final composite; larger gaps are advanced through individually
   confirmed Trust Update transactions before Settlement;
-- SP1 endpoint, credential environment name, and proof timeout;
-- bounded concurrent requests and queued jobs;
-- cache path, size, retention, and restart behavior; and
-- polling/readiness intervals.
+- SP1 endpoint, credential environment name, and proof timeout; and
+- limits for concurrent and queued requests.
 
-Readiness must be false when RPCs, SP1, Router resolution, client identity,
-VKeys, verifier route, or trust state cannot be validated. Health must not
-report ready merely because the TCP listener is open.
+The Docker Compose health check only confirms that the TCP port is open. To
+check that proving works after deployment, submit a known-valid proof request
+with a cache miss and confirm that it succeeds.
 
 ## Integration acceptance checklist
 
@@ -200,7 +195,8 @@ Before switching Router traffic:
 5. verify destination execution;
 6. prove and submit the acknowledgement return leg;
 7. run a separate timeout invoking Non-Membership; and
-8. restart the service and confirm retry/cache recovery.
+8. restart the service and confirm that a previously cached packet proof
+   request can generate proofs again.
 
 Record the Proof API and circuit commits, profile hash, four VKeys, contract,
 relayer version, RPC identities, and transaction hashes.

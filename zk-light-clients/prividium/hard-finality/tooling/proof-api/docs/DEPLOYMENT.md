@@ -19,8 +19,7 @@ Collect one reviewed release bundle:
 - the source IBC store, settlement Diamond and storage slots; and
 - SP1 gateway credentials and the destination trust-update signer key.
 
-The profile, ELFs, VKeys, initial trust, deployed client and Proof API binary
-must belong to the same release. This mode does not use an attestor key.
+The profile, ELFs, VKeys, initial trust, deployed client and Proof API binary must belong to the same release.
 
 Capture `initial-trust.json` with
 `scripts/capture-beacon-bootstrap.sh` from the repository root and deploy the

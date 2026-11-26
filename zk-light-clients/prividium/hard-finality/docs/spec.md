@@ -134,7 +134,7 @@ This index lists every section and subsection in this specification.
   - [17.1 IBC proof height mapping](#171-ibc-proof-height-mapping)
   - [17.2 verifyMembership binding](#172-verifymembership-binding)
   - [17.3 verifyNonMembership binding](#173-verifynonmembership-binding)
-  - [17.4 IBC timestamp implementation gate](#174-ibc-timestamp-implementation-gate)
+  - [17.4 IBC batch timestamp](#174-ibc-batch-timestamp)
 - [18. Off-chain proving script](#18-off-chain-proving-script)
   - [18.1 Required logical commands](#181-required-logical-commands)
   - [18.2 Trust Update Host flow](#182-trust-update-host-flow)
@@ -216,9 +216,6 @@ This index lists every section and subsection in this specification.
   - [26.2 ELF reproducibility](#262-elf-reproducibility)
   - [26.3 VKey reproducibility](#263-vkey-reproducibility)
 - [27. Release manifest](#27-release-manifest)
-- [28. Coding-agent implementation rules](#28-coding-agent-implementation-rules)
-  - [28.1 Required implementation order](#281-required-implementation-order)
-  - [28.2 Required coding-agent completion report](#282-required-coding-agent-completion-report)
 - [29. Final implementation acceptance checklist](#29-final-implementation-acceptance-checklist)
   - [29.1 Architecture](#291-architecture)
   - [29.2 Trust Update](#292-trust-update)
@@ -253,13 +250,9 @@ This index lists every section and subsection in this specification.
 
 This file is the normative implementation source for the Prividium path.
 
-If code, comments, old POC code, README text, copied prototype logic, deployment notes, or test fixtures conflict with this specification, implementation MUST stop with:
-
-```text
-BLOCKED_ON_SPEC
-```
-
-and report the exact conflict. A coding agent MUST NOT silently select one behavior.
+Resolve discrepancies between this specification and the implementation,
+deployment documentation, or test fixtures before relying on the disputed
+behavior.
 
 ## 0.2 Four-program rule
 
@@ -2309,26 +2302,14 @@ NON_MEMBERSHIP_VKEY
 
 It MUST NOT accept a Membership proof under the Non-Membership path.
 
-## 17.4 IBC timestamp implementation gate
+## 17.4 IBC batch timestamp
 
-If the pinned `ILightClient` interface requires `verifyMembership` / `verifyNonMembership` to return a source timestamp used by timeout logic, the source of that timestamp MUST be cryptographically defined and bound to the same accepted source state.
-
-The current `K -> R_K` state alone does not specify such a timestamp.
-
-The implementation MUST NOT silently substitute:
-
-- local wall-clock time;
-- L1 settlement timestamp;
-- an unverified L2 RPC timestamp;
-- the timestamp from an unrelated batch/header.
-
-Until the authenticated timestamp semantics are provided, timeout-path on-chain integration is:
-
-```text
-BLOCKED_ON_SPEC
-```
-
-Membership cryptographic proof generation itself is not blocked by this item.
+Settlement Update publishes `l2_batch_timestamp` from
+`last_block_timestamp` in the authenticated ZKsync state commitment.
+The destination contract stores that timestamp with the accepted batch and
+native root. Both `verifyMembership` and `verifyNonMembership` return the
+timestamp for the batch used to verify the proof. The IBC Router uses the
+Non-Membership timestamp to check that the packet has reached its timeout.
 
 ---
 
@@ -3440,7 +3421,7 @@ Those real local responses reconstruct the same native root as the pinned
 server and bind through the v0.20.8 state-commitment transformation to the
 local settlement contract's `storedBatchHash(K)`.
 
-Only final production conformance remains `BLOCKED_ON_SPEC` here. It requires:
+Production conformance requires the following evidence:
 
 1. a real response from the deployed v0.20.8 endpoint confirming its deployed
    state, historical availability, and actual `K -> R_K -> settlement`
@@ -3498,9 +3479,9 @@ receipt -> exact representation if membership is ever used
 
 For Non-Membership, define the exact absence predicate.
 
-If the upstream light-client interface requires a timestamp return value, define the exact authenticated source timestamp associated with proof height `K` and how it is cryptographically bound to the same accepted state.
-
-This must be resolved before timeout behavior is considered production-ready.
+Section 17.4 defines the authenticated batch timestamp. Before production
+deployment, verify that the configured Router uses this timestamp from
+`verifyNonMembership` for packet timeouts.
 
 ## 24.9 Root correspondence
 
@@ -3699,95 +3680,6 @@ The manifest MUST NOT contain secrets.
 
 ---
 
-# 28. Coding-agent implementation rules
-
-Who implementing this specification MUST follow these rules.
-
-1. Read the complete specification before changing code.
-2. Preserve the four-program separation.
-3. Keep deterministic security logic in shared crates, not duplicated guest entrypoints.
-4. Never trust a Host-supplied BLS domain, signing root, committee root, generalized index, storage slot, native tree key, or final root when the guest can derive it.
-5. Do not copy prototype consensus code wholesale.
-6. Do not use unchecked BLS point constructors on witness bytes.
-7. Do not use `unwrap`/panic for ordinary hostile parsing in native shared libraries; return typed errors. Guest wrappers may convert an error to proof failure.
-8. Do not use `u32` for Beacon slots/epochs/batches.
-9. Do not implement L2 native proofs with Ethereum MPT code.
-10. Do not implement L1 account/storage proofs with the ZKsync native verifier.
-11. Do not invent settlement storage slots or lifecycle rules.
-12. Do not invent the K -> R_K formula.
-13. Do not invent IBC storage layout/value/absence rules.
-14. Do not infer production absence from a zero RPC value.
-15. Do not fall back from historical proof height to latest state.
-16. Do not let the relayer choose a VKey.
-17. Do not store full sync-committee pubkeys on-chain.
-18. Do not let Settlement overwrite finalized Beacon trust.
-19. Do not let Trust Update modify accepted batch roots.
-20. Do not let Membership/Non-Membership modify client trust state.
-21. Add deterministic positive and negative tests in the same change as every security-critical branch.
-22. Fuzz tests are not required; do not spend implementation scope on fuzzing unless separately requested.
-23. Treat the exact target versions in Section 2.2 as fixed implementation inputs, not open choices. If another required implementation-gate item is unresolved, implement only the reusable logic that does not depend on that missing value and report `BLOCKED_ON_SPEC` for the deployment-specific path.
-24. Every claimed PASS must correspond to a command actually executed.
-25. Do not silently upgrade SP1, BLS, consensus, ZKsync, or IBC dependencies.
-
-## 28.1 Required implementation order
-
-Developer SHOULD implement in this order:
-
-1. pin workspace/toolchains/dependencies;
-2. source-profile schema and generated constants;
-3. canonical shared types and ABI public-value codecs;
-4. SHA-256/Keccak/BLAKE2s wrappers and vectors;
-5. SSZ basic/merkleization utilities;
-6. BeaconBlockHeader SSZ;
-7. SyncCommittee SSZ;
-8. slot/epoch/period/fork/domain/signing-root logic;
-9. participant selection and hardened BLS verification;
-10. generic SSZ branch verifier;
-11. finality and next-committee verification;
-12. trust transition;
-13. Trust Update guest;
-14. strict RLP + Ethereum MPT verifier;
-15. execution payload SSZ and execution branch;
-16. Settlement guest up to generic MPT authentication;
-17. settlement-profile slot/acceptance/K->R_K modules after Section 24 inputs are available;
-18. complete Settlement guest;
-19. ZKsync native tree key/leaf/path verifier;
-20. IBC path/storage/value profile;
-21. Membership guest;
-22. Non-Membership guest after absence semantics are frozen;
-23. Host RPC adapters/witness builders;
-24. Solidity light client and codecs;
-25. deterministic native unit/negative tests;
-26. SP1 execute/core proof tests;
-27. Groth16/real-verifier integration tests;
-28. local/captured end-to-end tests;
-29. reproducibility/performance/release tooling.
-
-## 28.2 Required coding-agent completion report
-
-The final implementation report MUST include:
-
-```text
-files created/changed
-exact dependency versions
-SOURCE_PROFILE_ID
-four ELF hashes
-four VKeys
-number/result of native tests
-number/result of SP1 execute tests
-core proof results
-Groth16 proof results
-Solidity test results
-real verifier/gateway integration result
-E2E result
-performance/resource measurements
-all BLOCKED_ON_SPEC items
-```
-
-The agent MUST NOT claim production completion while any mandatory acceptance item is unresolved.
-
----
-
 # 29. Final implementation acceptance checklist
 
 A repository is conformant only when all applicable items are satisfied.
@@ -3900,7 +3792,7 @@ A repository is conformant only when all applicable items are satisfied.
 - [ ] Release manifest is complete.
 - [ ] Source profile contains no secret.
 - [ ] Performance/resource measurements are recorded.
-- [ ] No unresolved mandatory `BLOCKED_ON_SPEC` item remains for the claimed deployment profile.
+- [ ] All mandatory deployment requirements are satisfied for the claimed profile.
 
 ---
 

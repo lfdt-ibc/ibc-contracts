@@ -7,10 +7,10 @@ use crate::{
     storage::{decode_fixed, strict_json, validate_quantity, validate_zks_get_proof},
     EngineError,
 };
+use prividium_settlement::stored_batch_hash_slot;
 use reqwest::blocking::Client as HttpClient;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha3::{Digest, Keccak256};
 use std::time::Duration;
 
 const OPTIMISTIC_UPDATE_PATH: &str = "/eth/v1/beacon/light_client/optimistic_update";
@@ -173,13 +173,6 @@ impl StateEvidenceSource for SettlementEvidenceCollector {
             settlement_account_proof: strict_json(&l1_raw, "eth_getProof response")?,
         })
     }
-}
-
-fn stored_batch_hash_slot(batch: u64, mapping_base_slot: [u8; 32]) -> [u8; 32] {
-    let mut preimage = [0_u8; 64];
-    preimage[24..32].copy_from_slice(&batch.to_be_bytes());
-    preimage[32..].copy_from_slice(&mapping_base_slot);
-    Keccak256::digest(preimage).into()
 }
 
 #[derive(Deserialize)]
