@@ -1,0 +1,12 @@
+[package]
+name = "prividium-ethereum-mpt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prividium-crypto = { path = "../crypto" }
+prividium-types = { path = "../types" }
+
+[lints]
+workspace = true

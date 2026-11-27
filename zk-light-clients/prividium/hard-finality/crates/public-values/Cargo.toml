@@ -1,0 +1,12 @@
+[package]
+name = "prividium-public-values"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prividium-crypto = { path = "../crypto" }
+prividium-types = { path = "../types" }
+
+[lints]
+workspace = true

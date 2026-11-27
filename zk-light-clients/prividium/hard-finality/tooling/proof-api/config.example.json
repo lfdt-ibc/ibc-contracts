@@ -1,0 +1,82 @@
+{
+  "sourceProfilePath": "/etc/prividium/source-profile.json",
+  "sourceProfileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "bindAddress": "127.0.0.1:8080",
+  "client": {
+    "chainId": "partior-local",
+    "clientId": "prividium-0",
+    "counterpartyClientId": "partior-0",
+    "counterpartyMerklePrefix": ["0x"]
+  },
+  "prover": {
+    "networkRpcUrl": "https://network-gateway.example.com",
+    "networkPrivateKeyEnv": "PRIVIDIUM_SP1_NETWORK_PRIVATE_KEY",
+    "proofTimeoutSeconds": 3600
+  },
+  "l2Rpc": {
+    "url": "https://prividium-l2.example.com",
+    "chainId": 6565,
+    "tokenEnv": "PRIVIDIUM_L2_RPC_TOKEN",
+    "maxResponseBytes": 16777216,
+    "maxBatchLookback": 2048
+  },
+  "ibcStorage": {
+    "supportedPathShapeId": "synthetic-raw-bytes-v1",
+    "storageProfileId": "synthetic-direct-mapping-v1",
+    "storeAddress": "0x0000000000000000000000000000000000000000",
+    "mappingBaseSlot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "maxClientIdBytes": 128,
+    "nativeRootProbeSlot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "absenceProfileId": 1
+  },
+  "bootstrap": {
+    "beaconUrl": "https://l1-beacon.example.com",
+    "tokenEnv": "PRIVIDIUM_BEACON_TOKEN",
+    "finalizedCheckpointRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "sourceProfileId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "initialTrustPath": "/etc/prividium/initial-trust.json",
+    "initialTrustSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "syncCommitteeSize": 1,
+    "slotsPerEpoch": 32,
+    "epochsPerSyncCommitteePeriod": 256,
+    "maxResponseBytes": 16777216
+  },
+  "apiTokenEnv": "PRIVIDIUM_PROOF_API_TOKEN",
+  "requestTimeoutSeconds": 1800,
+  "maxConcurrentRequests": 4,
+  "maxQueuedRequests": 16,
+  "maxConcurrentHeightRequests": 16,
+  "maxAutomaticTrustUpdates": 8,
+  "l1Rpc": {
+    "url": "https://l1-execution.example.com",
+    "chainId": 31337,
+    "tokenEnv": "PRIVIDIUM_L1_RPC_TOKEN",
+    "maxResponseBytes": 16777216
+  },
+  "destination": {
+    "rpc": {
+      "url": "https://destination-besu.example.com",
+      "chainId": 1337,
+      "tokenEnv": "PRIVIDIUM_DESTINATION_RPC_TOKEN",
+      "maxResponseBytes": 16777216
+    },
+    "routerAddress": "0x0000000000000000000000000000000000000000",
+    "verifierAddress": "0x0000000000000000000000000000000000000000",
+    "trustUpdateVkey": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "settlementUpdateVkey": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "membershipVkey": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "nonMembershipVkey": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "trustUpdateRegistrar": {
+      "privateKeyEnv": "PRIVIDIUM_TRUST_UPDATE_REGISTRAR_PRIVATE_KEY",
+      "chainId": 1337,
+      "receiptTimeoutSeconds": 120,
+      "receiptPollMilliseconds": 1000,
+      "maxGas": 8000000
+    }
+  },
+  "settlement": {
+    "diamondProxyAddress": "0x0000000000000000000000000000000000000000",
+    "storedBatchHashMappingBaseSlot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "totalBatchesExecutedSlot": "0x000000000000000000000000000000000000000000000000000000000000000b"
+  }
+}

@@ -1,0 +1,15 @@
+[package]
+name = "prividium-settlement"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prividium-ethereum-mpt = { path = "../ethereum-mpt" }
+prividium-crypto = { path = "../crypto" }
+prividium-ssz = { path = "../ssz" }
+prividium-types = { path = "../types" }
+prividium-zksync-native = { path = "../zksync-native" }
+
+[lints]
+workspace = true

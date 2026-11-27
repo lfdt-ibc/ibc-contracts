@@ -1,0 +1,14 @@
+{
+  "testDataId": "zksync-os-v0.20.8-local-existing-zero",
+  "testDataVersion": 1,
+  "sourceType": "local-dev",
+  "sourceReference": "Real zks_getProof and unstable_getBatchByBlockNumber responses after nonzero-to-zero update",
+  "sourceProfileId": null,
+  "inputFiles": ["raw-response.json", "raw-batch-response.json", "normalized.json"],
+  "expectedSuccess": true,
+  "expectedDecodedFields": {"l2Block": 5, "l1Batch": 5, "proofType": "existing", "value": "0x0000000000000000000000000000000000000000000000000000000000000000", "index": 103, "nextIndex": 92},
+  "expectedHashes": {"nativeTreeRoot": "0x931b17233867e41047e3f1fb4a3400647ad8eefcb2d495824918a2916c662932", "stateCommitment": "0xb9af383b2a2a9ff142363956da8ed0349ab104dd10dfdc2ad6418c35fc438181"},
+  "expectedPublicValuesHex": null,
+  "expectedError": null,
+  "mutation": null
+}

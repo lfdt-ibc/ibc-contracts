@@ -1,0 +1,31 @@
+[package]
+name = "prividium-program-logic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+sp1-execute-tests = ["dep:sp1-sdk"]
+
+[dependencies]
+prividium-bls = { path = "../bls" }
+prividium-consensus = { path = "../consensus" }
+prividium-crypto = { path = "../crypto" }
+prividium-ibc-storage = { path = "../ibc-storage" }
+prividium-profile-constants = { path = "../profile-constants" }
+prividium-public-values = { path = "../public-values" }
+prividium-settlement = { path = "../settlement" }
+prividium-ssz = { path = "../ssz" }
+prividium-types = { path = "../types" }
+prividium-zksync-native = { path = "../zksync-native" }
+sp1-sdk = { workspace = true, optional = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+bls12_381.workspace = true
+prividium-ethereum-mpt = { path = "../ethereum-mpt" }
+serde.workspace = true
+sha2.workspace = true

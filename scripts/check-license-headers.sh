@@ -53,6 +53,9 @@ EXCLUDED_PATHS=(
 # Forked from OpenZeppelin Contracts; retain the upstream MIT license identifier.
 PRESERVED_HEADERS=(
   'ibc-solidity/contracts/light-clients/utils/TrieProof.sol'
+
+  # Interface retained from the MIT-licensed SP1 contracts package.
+  'zk-light-clients/prividium/hard-finality/contracts/src/interfaces/ISP1Verifier.sol'
 )
 
 # Markers that identify machine-generated files, matched case-insensitively against the
