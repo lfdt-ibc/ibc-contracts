@@ -1,0 +1,3 @@
+@ibc-contracts/=vendor/ibc/
+forge-std/=lib/sp1-contracts/contracts/lib/forge-std/src/
+@sp1-contracts/=lib/sp1-contracts/contracts/src/

@@ -1,0 +1,15 @@
+[package]
+name = "prividium-consensus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prividium-ssz = { path = "../ssz" }
+prividium-types = { path = "../types" }
+
+[dev-dependencies]
+prividium-crypto = { path = "../crypto" }
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+{
+  "evidenceSchemaVersion": 1,
+  "status": "partial-not-a-source-profile",
+  "zksyncOsServerVersion": "v0.20.8",
+  "zksyncOsServerCommit": "dbb5c03d4a94ceb1acea9f79242590f354660239",
+  "zksyncOsDependencyCommit": "b4193659af83b6c71419ddda3f57e0302c61eb8d",
+  "diamondProxyAddress": "0xB22045B7a9cfBFF99C65089Dd8256988bcf04162",
+  "bridgehubAddress": "0x3abc6e300adb80ed3e6b5303d6f3d75fa19f15c4",
+  "bytecodeSupplierAddress": "0xda067a09988ed8d45f6e141ca62ecf9f3cf70604",
+  "warning": "Deployment evidence only. This is intentionally rejected as a SourceProfileV1 and defines no storage layout, lifecycle rule, or K-to-root binding."
+}

@@ -1,0 +1,55 @@
+{
+  "profileSchemaVersion": 1,
+  "profileName": "synthetic-local",
+  "consensus": {
+    "genesisValidatorsRoot": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "genesisTime": 1700000000,
+    "secondsPerSlot": 12,
+    "slotsPerEpoch": 32,
+    "epochsPerSyncCommitteePeriod": 256,
+    "syncCommitteeSize": 8,
+    "forkSchedule": [
+      {
+        "forkId": "synthetic-v1",
+        "activationEpoch": 0,
+        "forkVersion": "0x01020304"
+      }
+    ],
+    "supportedLightClientHeaderSchemas": ["synthetic-v1"],
+    "supportedExecutionPayloadHeaderSchemas": ["synthetic-v1"],
+    "forkSpecificFinalityGindices": [
+      {"forkId": "synthetic-v1", "generalizedIndex": 105}
+    ],
+    "forkSpecificNextCommitteeGindices": [
+      {"forkId": "synthetic-v1", "generalizedIndex": 55}
+    ],
+    "forkSpecificExecutionGindices": [
+      {"forkId": "synthetic-v1", "generalizedIndex": 25}
+    ]
+  },
+  "settlement": {
+    "diamondProxyAddress": "0x2222222222222222222222222222222222222222",
+    "diamondSourceCommit": "3333333333333333333333333333333333333333",
+    "settlementStorageProfileId": "synthetic-layout-v1",
+    "acceptedLifecycleRuleId": "synthetic-executed-v1",
+    "nativeRootBindingRuleId": "zksync-os-v0.20.8-stored-batch-info-v1",
+    "storedBatchHashMappingBaseSlot": "0x0000000000000000000000000000000000000000000000000000000000000011",
+    "totalBatchesExecutedSlot": "0x0000000000000000000000000000000000000000000000000000000000000010"
+  },
+  "prividiumL2": {
+    "chainId": 6565,
+    "zksyncOsVersion": "v0.20.8",
+    "zksyncOsCommit": "dbb5c03d4a94ceb1acea9f79242590f354660239",
+    "nativeTreeProfileId": "zksync-os-v0.20.8-native",
+    "ibcStoreAddress": "0x4444444444444444444444444444444444444444",
+    "ibcStorageProfileId": "synthetic-direct-mapping-v1",
+    "absenceProfileId": 1,
+    "ibcMappingBaseSlot": "0x0000000000000000000000000000000000000000000000000000000000000022",
+    "maxClientIdBytes": 128,
+    "applicationAbsenceRule": "native-non-existing-only-v1"
+  },
+  "ibc": {
+    "ibcContractsCommit": "5555555555555555555555555555555555555555",
+    "supportedPathShapeId": "synthetic-raw-bytes-v1"
+  }
+}

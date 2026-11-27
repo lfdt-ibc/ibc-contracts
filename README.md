@@ -31,6 +31,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for contributi
 | [`ibc-solidity/programs/`](ibc-solidity/programs/) | The Rust programs maintained alongside the contracts: the SP1 programs, the CosmWasm Ethereum light client, and the SP1 fixture operator. |
 | [`ibc-solana/`](ibc-solana/README.md) | IBC core, applications, and light clients implemented as Anchor programs, with shared crates and integration tests. |
 | [`programs/proof-api/`](programs/proof-api/) | Serves the proofs a relayer submits. |
+| [`zk-light-clients/prividium/hard-finality/`](zk-light-clients/prividium/hard-finality/README.md) | Settlement-backed hard-finality SP1 light client, circuits, and Proof API for ZKsync Prividium. |
 | [`packages/`](packages/) | Shared Rust crates, including `go-abigen/` for the Go bindings. |
 | [`e2e/`](e2e/) | End-to-end tests, powered by [interchaintest](https://github.com/strangelove-ventures/interchaintest). |
 | [`docs/`](docs/) | Architecture decision records and [audit reports](docs/audits). |

@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  proof-api-hard-finality:
+    image: ${PRIVIDIUM_PROOF_API_IMAGE:?set PRIVIDIUM_PROOF_API_IMAGE}
+    build:
+      context: ../..
+      dockerfile: tooling/proof-api/Dockerfile
+      additional_contexts:
+        circuit-artifacts: ${PRIVIDIUM_CIRCUIT_ELF_DIR:?set PRIVIDIUM_CIRCUIT_ELF_DIR}
+        source-profile: ${PRIVIDIUM_SOURCE_PROFILE_CONTEXT:?set PRIVIDIUM_SOURCE_PROFILE_CONTEXT}
+    container_name: prividium-proof-api-hard-finality
+    network_mode: host
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "${PRIVIDIUM_RUN_UID:?set PRIVIDIUM_RUN_UID}:${PRIVIDIUM_RUN_GID:?set PRIVIDIUM_RUN_GID}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: bind
+        source: ${PRIVIDIUM_OPERATOR_ENV_FILE:?set PRIVIDIUM_OPERATOR_ENV_FILE}
+        target: /run/secrets/operator.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${PRIVIDIUM_CIRCUIT_ELF_DIR:?set PRIVIDIUM_CIRCUIT_ELF_DIR}
+        target: /opt/prividium/elfs
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${PRIVIDIUM_PROGRAM_VKEYS_FILE:?set PRIVIDIUM_PROGRAM_VKEYS_FILE}
+        target: /opt/prividium/program-vkeys.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${PRIVIDIUM_SOURCE_PROFILE_CONTEXT:?set PRIVIDIUM_SOURCE_PROFILE_CONTEXT}/source-profile.json
+        target: /opt/prividium/source-profile.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${PRIVIDIUM_INITIAL_TRUST_FILE:?set PRIVIDIUM_INITIAL_TRUST_FILE}
+        target: /opt/prividium/initial-trust.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${PRIVIDIUM_STATE_DIRECTORY:?set PRIVIDIUM_STATE_DIRECTORY}
+        target: /var/lib/prividium-proof-api
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'exec 3<>/dev/tcp/127.0.0.1/${PRIVIDIUM_PROOF_API_PORT:?set PRIVIDIUM_PROOF_API_PORT}'
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 30s

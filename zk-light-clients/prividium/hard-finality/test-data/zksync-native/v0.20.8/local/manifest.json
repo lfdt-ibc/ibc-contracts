@@ -1,0 +1,20 @@
+{
+  "testDataId": "zksync-os-v0.20.8-local-native-proof-suite",
+  "testDataVersion": 1,
+  "sourceType": "local-dev",
+  "sourceReference": "zksync-os-server v0.20.8 commit dbb5c03d4a94ceb1acea9f79242590f354660239; zksync-os b4193659af83b6c71419ddda3f57e0302c61eb8d",
+  "sourceProfileId": null,
+  "inputFiles": [
+    "existing-nonzero/raw-response.json",
+    "existing-nonzero/raw-batch-response.json",
+    "never-existing/raw-response.json",
+    "existing-zero/raw-response.json",
+    "existing-zero/raw-batch-response.json"
+  ],
+  "expectedSuccess": true,
+  "expectedDecodedFields": "See each child fixture manifest and normalized.json",
+  "expectedHashes": "See each child fixture manifest and normalized.json",
+  "expectedPublicValuesHex": null,
+  "expectedError": null,
+  "mutation": null
+}

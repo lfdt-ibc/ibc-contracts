@@ -1,0 +1,15 @@
+[package]
+name = "prividium-non-membership-program"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+prividium-program-logic = { path = "../../crates/program-logic" }
+prividium-public-values = { path = "../../crates/public-values" }
+prividium-types = { path = "../../crates/types" }
+prividium-zksync-native = { path = "../../crates/zksync-native" }
+sp1-zkvm.workspace = true
+
+[lints]
+workspace = true

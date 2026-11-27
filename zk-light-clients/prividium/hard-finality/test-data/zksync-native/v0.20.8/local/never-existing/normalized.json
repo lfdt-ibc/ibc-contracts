@@ -1,0 +1,28 @@
+{
+  "case": "never-existing",
+  "serverTag": "v0.20.8",
+  "serverCommit": "dbb5c03d4a94ceb1acea9f79242590f354660239",
+  "l2Block": 4,
+  "l1Batch": 4,
+  "address": "0xe441cf0795af14ddb9f7984da85cd36db1b8790d",
+  "slot": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "nativeTreeKey": "0xc14de4ee585a6de92c6944aa4b68ddd60009226870b47ebef9ac79d3e7c65a26",
+  "proofType": "nonExisting",
+  "leftNeighbor": {
+    "leafKey": "0xbf0eaf67aee349ebb15976a36fedac1a4a0665503ad3717ff3fe6ae078b3659c",
+    "index": 52,
+    "nextIndex": 22,
+    "explicitSiblingCount": 7
+  },
+  "rightNeighbor": {
+    "leafKey": "0xc1a26e362c7e4f4307b14b3deda44d3931abc575922152b5bba5ee00168952d6",
+    "index": 22,
+    "nextIndex": 95,
+    "explicitSiblingCount": 7
+  },
+  "omittedTrailingEmptySiblingCountPerNeighbor": 57,
+  "nativeTreeRoot": "0x1efd73ca324557ff31d344658562e41262281781c16020ba90ed12b79c56950b",
+  "stateCommitment": "0xd3ec308c0eee7ab0154ef61aa094f8c3e4e3c3f1a3bbcabcd05ab351fe2c4122",
+  "applicationMeaningOfAbsence": null,
+  "neverWrittenBasis": "Fresh ephemeral chain; test contract runtime only executes SSTORE(0, CALLDATALOAD(0)); queried slot is 2^256-1."
+}

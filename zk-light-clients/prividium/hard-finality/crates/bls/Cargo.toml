@@ -1,0 +1,16 @@
+[package]
+name = "prividium-bls"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bls12_381.workspace = true
+prividium-types = { path = "../types" }
+sha2.workspace = true
+
+[dev-dependencies]
+hex.workspace = true
+
+[lints]
+workspace = true

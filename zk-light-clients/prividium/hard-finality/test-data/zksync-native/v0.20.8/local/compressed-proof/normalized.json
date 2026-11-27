@@ -1,0 +1,10 @@
+{
+  "case": "compressed-proof",
+  "sourceCase": "never-existing",
+  "treeDepth": 64,
+  "leftExplicitSiblings": 7,
+  "rightExplicitSiblings": 7,
+  "leftExpandedEmptySiblings": 57,
+  "rightExpandedEmptySiblings": 57,
+  "nativeTreeRoot": "0x1efd73ca324557ff31d344658562e41262281781c16020ba90ed12b79c56950b"
+}
